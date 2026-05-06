@@ -31,6 +31,7 @@ This script is designed to be:
 
 import argparse
 import json
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, TextIO
@@ -125,27 +126,29 @@ def make_grouped_row(
     """
     Construct one normalized row for a single language/word/POS group.
 
-    head_templates is preserved as raw JSON-compatible metadata. This keeps
-    pronunciation and morphology clues available for later parsing without
-    committing to a schema now.
+    head_templates may be either a dict or a list of dicts. For now, the
+    expansion field is preserved when available and treated as presentation
+    metadata, not embedding text.
     """
     cleaned_glosses = clean_glosses(glosses)
 
     if not cleaned_glosses:
         return None
 
-    embedding_text = " ".join(cleaned_glosses)
-
     row = {
         "lang": lang,
         "word": word,
         "pos": pos,
         "glosses": cleaned_glosses,
-        "embedding_text": embedding_text,
+        "embedding_text": " ".join(cleaned_glosses),
     }
 
-    if head_templates is not None:
-        row["head_templates"] = head_templates
+    if isinstance(head_templates, dict):
+        row["expansion"] = head_templates.get("expansion")
+
+    elif isinstance(head_templates, list):
+        if head_templates and isinstance(head_templates[0], dict):
+            row["expansion"] = head_templates[0].get("expansion")
 
     return row
 
@@ -412,6 +415,8 @@ def normalize_jsonl(
     if run_id is None:
         run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
+    start_time = time.perf_counter()
+    total_rows = 0
     total_records = 0
     skipped_bad_json = 0
     skipped_non_object = 0
@@ -448,13 +453,21 @@ def normalize_jsonl(
                 total_records += 1
 
                 if progress_every > 0 and total_records % progress_every == 0:
+                    elapsed = time.perf_counter() - start_time
+                    records_per_sec = total_records / elapsed if elapsed > 0 else 0
+                    rows_per_sec = total_rows / elapsed if elapsed > 0 else 0
+
                     print(
                         f"[progress] records={total_records:,} "
+                        f"rows={total_rows:,} "
                         f"bytes={total_output_bytes:,} "
-                        f"approx_mb={total_output_bytes / 1024 / 1024:.2f}"
+                        f"elapsed={elapsed:.1f}s "
+                        f"records/s={records_per_sec:.1f} "
+                        f"rows/s={rows_per_sec:.1f}"
                     )
 
                 for row in normalize_record(record):
+                    total_rows += 1
                     total_output_bytes += row_json_bytes(row)
 
                     if writer is not None:
@@ -464,7 +477,6 @@ def normalize_jsonl(
         if writer is not None:
             writer.close()
 
-    total_rows = writer.total_rows if writer is not None else None
     shards = writer.shards if writer is not None else []
 
     if count_bytes_only:
@@ -493,27 +505,49 @@ def normalize_jsonl(
         shards=shards,
     )
 
+    elapsed = time.perf_counter() - start_time
+
     print(f"run id: {run_id}")
     print(f"input: {input_path}")
     print(f"output dir: {output_dir}")
     print(f"manifest: {manifest_path}")
-    print(f"records read: {total_records}")
-    print(f"normalized rows written: {writer.total_rows}")
-    print(f"shards written: {len(writer.shards)}")
-    print(f"bad json lines skipped: {skipped_bad_json}")
-    print(f"non-object records skipped: {skipped_non_object}")
-    print(f"empty lines skipped: {skipped_empty_lines}")
+    print(f"records read: {total_records:,}")
+
+    if writer is not None:
+        print(f"normalized rows written: {writer.total_rows:,}")
+        print(f"shards written: {len(writer.shards):,}")
+    else:
+        print(f"rows counted: {total_rows:,}")
+        print(f"estimated output bytes: {total_output_bytes:,}")
+        print(f"estimated MiB: {total_output_bytes / 1024 / 1024:.2f}")
+
+    print(f"bad json lines skipped: {skipped_bad_json:,}")
+    print(f"non-object records skipped: {skipped_non_object:,}")
+    print(f"empty lines skipped: {skipped_empty_lines:,}")
+
+    print(f"elapsed seconds: {elapsed:.2f}")
+    print(f"records/sec: {total_records / elapsed:.1f}")
+    print(f"rows/sec: {total_rows / elapsed:.1f}")
 
 
 def main() -> None:
     """
     CLI entry point.
 
-    Example:
-        python parse_wiktionary.py \
+    Examples:
+
+    Full run:
+        python ./src/embeddings/parse_wiktionary.py \
             --input data/raw/wiktionary.jsonl \
             --output-dir data/processed/normalized \
             --manifest data/processed/manifest.json
+
+    Byte-count only (no files written):
+        python parse_wiktionary.py \
+            --input data/raw/wiktionary.jsonl \
+            --output-dir /tmp/unused \
+            --manifest /tmp/unused.json \
+            --count-bytes-only
     """
     parser = argparse.ArgumentParser(
         description="Normalize Wiktionary JSONL records into sharded grouped rows."
@@ -557,6 +591,19 @@ def main() -> None:
         help="Optional run identifier for manifest metadata.",
     )
 
+    parser.add_argument(
+        "--count-bytes-only",
+        action="store_true",
+        help="Do not write shards; only estimate output size.",
+    )
+
+    parser.add_argument(
+        "--progress-every",
+        type=int,
+        default=100_000,
+        help="Print progress every N processed records.",
+    )
+
     args = parser.parse_args()
 
     normalize_jsonl(
@@ -566,6 +613,8 @@ def main() -> None:
         shard_size=args.shard_size,
         limit=args.limit,
         run_id=args.run_id,
+        count_bytes_only=args.count_bytes_only,
+        progress_every=args.progress_every,
     )
 
 
