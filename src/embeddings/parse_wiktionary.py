@@ -10,7 +10,7 @@ Key design decisions:
 - One output row per raw (language, word, part of speech) record
 - Glosses are aggregated across all senses in that record
 - Glosses are preserved as an ordered list after deduplication
-- Embedding text is constructed as: "{word} ({pos}, {lang}): <joined glosses>"
+- Embedding text is constructed from joined cleaned glosses only
 - Output is written as deterministic JSONL shards
 - A manifest file records run-level and shard-level metadata
 - Invalid or incomplete records are skipped
@@ -29,12 +29,22 @@ This script is designed to be:
 - Resumable-friendly (manifest describes completed shards)
 """
 
+from __future__ import annotations
+
 import argparse
 import json
-import time
-from datetime import datetime, timezone
+import sys
 from pathlib import Path
 from typing import Any, TextIO
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from src.common.jsonl import jsonl_row_bytes, write_jsonl_row
+from src.common.logging_utils import ProgressTimer, format_bytes, format_rate
+from src.common.manifest import write_manifest
+from src.common.run_id import utc_now_iso, utc_run_id
 
 
 SCHEMA_VERSION = "v4"
@@ -78,11 +88,9 @@ def clean_text(text: str) -> str:
     """
     Normalize whitespace in a string.
 
-    Removes leading/trailing whitespace and collapses repeated spaces,
-    tabs, and newlines into a single space.
-
-    This preserves Unicode characters. It does not transliterate, strip accents,
-    or otherwise alter lexical content.
+    Leading and trailing whitespace is removed, and repeated spaces, tabs,
+    and newlines are collapsed into a single space. Unicode lexical content is
+    preserved.
     """
     return " ".join(text.strip().split())
 
@@ -126,9 +134,8 @@ def make_grouped_row(
     """
     Construct one normalized row for a single language/word/POS group.
 
-    head_templates may be either a dict or a list of dicts. For now, the
-    expansion field is preserved when available and treated as presentation
-    metadata, not embedding text.
+    The `expansion` field is preserved when available as presentation metadata.
+    It is not included in `embedding_text`.
     """
     cleaned_glosses = clean_glosses(glosses)
 
@@ -144,11 +151,15 @@ def make_grouped_row(
     }
 
     if isinstance(head_templates, dict):
-        row["expansion"] = head_templates.get("expansion")
+        expansion = head_templates.get("expansion")
+        if expansion is not None:
+            row["expansion"] = expansion
 
     elif isinstance(head_templates, list):
         if head_templates and isinstance(head_templates[0], dict):
-            row["expansion"] = head_templates[0].get("expansion")
+            expansion = head_templates[0].get("expansion")
+            if expansion is not None:
+                row["expansion"] = expansion
 
     return row
 
@@ -157,15 +168,14 @@ def normalize_record(record: dict[str, Any]) -> list[dict[str, Any]]:
     """
     Convert one raw Wiktionary record into zero or one normalized rows.
 
-    The expected raw record has top-level fields:
+    Expected top-level fields:
     - lang
     - word
     - pos
     - senses
 
-    The normalized row aggregates all glosses across all senses for the same
-    raw record. This is appropriate because the dump already appears to split
-    entries by language and part of speech.
+    All usable glosses from all kept senses are aggregated into a single row for
+    the record's language, word, and part of speech.
     """
     lang = record.get("lang")
     word = record.get("word")
@@ -173,7 +183,6 @@ def normalize_record(record: dict[str, Any]) -> list[dict[str, Any]]:
     senses = record.get("senses", [])
     head_templates = record.get("head_templates")
 
-    # Required top-level fields must be present and non-empty strings.
     if not isinstance(lang, str) or not lang.strip():
         return []
 
@@ -193,17 +202,12 @@ def normalize_record(record: dict[str, Any]) -> list[dict[str, Any]]:
     if pos not in ALLOWED_POS:
         return []
 
-    # Gather all glosses from all senses before deduplication. This preserves
-    # rich descriptive information while removing repeated parent glosses.
     all_glosses: list[Any] = []
 
     for sense in senses:
         if not isinstance(sense, dict):
             continue
 
-        # Skip non-semantic or low-value senses before collecting glosses.
-        # These entries usually describe morphology, spelling variants,
-        # abbreviations, or dated usage rather than canonical meanings.
         if any(key in sense for key in SKIP_SENSE_KEYS):
             continue
 
@@ -234,8 +238,8 @@ class ShardWriter:
     """
     Write normalized rows into deterministic JSONL shard files.
 
-    A new shard is opened after shard_size rows. Each completed shard is
-    recorded in the manifest metadata.
+    A new shard is opened after `shard_size` rows. Each completed shard is
+    recorded for inclusion in the run manifest.
     """
 
     def __init__(self, output_dir: Path, shard_size: int) -> None:
@@ -243,7 +247,7 @@ class ShardWriter:
         Initialize shard writer state and open the first shard file.
 
         Args:
-            output_dir: Directory where shard files will be written.
+            output_dir: Directory where shard files are written.
             shard_size: Maximum number of rows per shard.
         """
         self.output_dir = output_dir
@@ -252,6 +256,7 @@ class ShardWriter:
         self.shard_id = 0
         self.rows_in_current_shard = 0
         self.total_rows = 0
+        self.total_bytes = 0
 
         self.current_file: TextIO | None = None
         self.current_path: Path | None = None
@@ -273,8 +278,7 @@ class ShardWriter:
         """
         Close the active shard and record its metadata.
 
-        This method assumes the shard contains at least one row.
-        Empty shard cleanup is handled in close().
+        Empty final-shard cleanup is handled by `close`.
         """
         if self.current_file is None or self.current_path is None:
             return
@@ -296,13 +300,11 @@ class ShardWriter:
     def write_row(self, row: dict[str, Any]) -> None:
         """
         Write one normalized row to the active shard.
-
-        If the active shard reaches shard_size, close it and open the next one.
         """
         if self.current_file is None:
             self._open_next_shard()
 
-        self.current_file.write(json.dumps(row, ensure_ascii=False) + "\n")
+        self.total_bytes += write_jsonl_row(self.current_file, row)
         self.rows_in_current_shard += 1
         self.total_rows += 1
 
@@ -314,9 +316,6 @@ class ShardWriter:
     def close(self) -> None:
         """
         Close the active shard and remove it if it is empty.
-
-        An empty final shard can be created when the previous shard closes
-        exactly at shard_size. Removing it keeps output directories clean.
         """
         if self.current_file is None:
             return
@@ -336,8 +335,7 @@ class ShardWriter:
         self._close_current_shard()
 
 
-def write_manifest(
-    manifest_path: Path,
+def build_preprocessing_manifest(
     *,
     run_id: str,
     input_path: Path,
@@ -349,19 +347,13 @@ def write_manifest(
     skipped_non_object: int,
     skipped_empty_lines: int,
     shards: list[dict[str, Any]],
-) -> None:
+) -> dict[str, Any]:
     """
-    Write run-level and shard-level metadata for reproducibility.
-
-    The manifest is intentionally lightweight. It records enough information to:
-    - identify the input and output locations
-    - confirm schema version
-    - inspect pipeline counts
-    - enumerate completed shard files
+    Build run-level and shard-level metadata for the preprocessing stage.
     """
-    manifest = {
+    return {
         "run_id": run_id,
-        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "created_at_utc": utc_now_iso(),
         "schema_version": SCHEMA_VERSION,
         "input_path": str(input_path),
         "output_dir": str(output_dir),
@@ -374,18 +366,6 @@ def write_manifest(
         "skipped_empty_lines": skipped_empty_lines,
         "shards": shards,
     }
-
-    manifest_path.parent.mkdir(parents=True, exist_ok=True)
-
-    with manifest_path.open("w", encoding="utf-8") as f:
-        json.dump(manifest, f, indent=2, ensure_ascii=False)
-
-
-def row_json_bytes(row: dict[str, Any]) -> int:
-    """
-    Return the UTF-8 byte size of one JSONL row, including trailing newline.
-    """
-    return len((json.dumps(row, ensure_ascii=False) + "\n").encode("utf-8"))
 
 
 def normalize_jsonl(
@@ -406,16 +386,19 @@ def normalize_jsonl(
         output_dir: Directory where shard files are written.
         manifest_path: Path to output manifest JSON.
         shard_size: Number of normalized rows per shard.
-        limit: Optional max number of input records to process.
-        run_id: Optional run identifier. If omitted, timestamp-based ID is used.
+        limit: Optional maximum number of input records to process.
+        run_id: Optional run identifier. If omitted, a UTC timestamp is used.
+        count_bytes_only: If true, estimate output size without writing shards.
+        progress_every: Print progress every N processed input records.
     """
     if shard_size <= 0:
         raise ValueError("shard_size must be positive")
 
     if run_id is None:
-        run_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        run_id = utc_run_id()
 
-    start_time = time.perf_counter()
+    timer = ProgressTimer(progress_every=progress_every)
+
     total_rows = 0
     total_records = 0
     skipped_bad_json = 0
@@ -428,7 +411,6 @@ def normalize_jsonl(
     try:
         with input_path.open("r", encoding="utf-8") as infile:
             for line_number, line in enumerate(infile, start=1):
-                # The optional limit is useful for local smoke tests.
                 if limit is not None and total_records >= limit:
                     break
 
@@ -438,8 +420,6 @@ def normalize_jsonl(
                     skipped_empty_lines += 1
                     continue
 
-                # Malformed lines are skipped so one bad record does not kill
-                # a large preprocessing job.
                 try:
                     record = json.loads(line)
                 except json.JSONDecodeError:
@@ -452,23 +432,16 @@ def normalize_jsonl(
 
                 total_records += 1
 
-                if progress_every > 0 and total_records % progress_every == 0:
-                    elapsed = time.perf_counter() - start_time
-                    records_per_sec = total_records / elapsed if elapsed > 0 else 0
-                    rows_per_sec = total_rows / elapsed if elapsed > 0 else 0
-
-                    print(
-                        f"[progress] records={total_records:,} "
-                        f"rows={total_rows:,} "
-                        f"bytes={total_output_bytes:,} "
-                        f"elapsed={elapsed:.1f}s "
-                        f"records/s={records_per_sec:.1f} "
-                        f"rows/s={rows_per_sec:.1f}"
+                if timer.should_print(total_records):
+                    timer.print_progress(
+                        records=total_records,
+                        rows=total_rows,
+                        bytes_written=total_output_bytes,
                     )
 
                 for row in normalize_record(record):
                     total_rows += 1
-                    total_output_bytes += row_json_bytes(row)
+                    total_output_bytes += jsonl_row_bytes(row)
 
                     if writer is not None:
                         writer.write_row(row)
@@ -480,19 +453,25 @@ def normalize_jsonl(
     shards = writer.shards if writer is not None else []
 
     if count_bytes_only:
+        elapsed = timer.elapsed()
+
         print("=== Byte Count Only ===")
         print(f"input: {input_path}")
         print(f"records read: {total_records:,}")
+        print(f"rows counted: {total_rows:,}")
         print(f"estimated output bytes: {total_output_bytes:,}")
+        print(f"estimated size: {format_bytes(total_output_bytes)}")
         print(f"estimated MiB: {total_output_bytes / 1024 / 1024:.2f}")
         print(f"estimated GiB: {total_output_bytes / 1024 / 1024 / 1024:.4f}")
         print(f"bad json lines skipped: {skipped_bad_json:,}")
         print(f"non-object records skipped: {skipped_non_object:,}")
         print(f"empty lines skipped: {skipped_empty_lines:,}")
+        print(f"elapsed seconds: {elapsed:.2f}")
+        print(f"records/sec: {format_rate(total_records, elapsed)}")
+        print(f"rows/sec: {format_rate(total_rows, elapsed)}")
         return
 
-    write_manifest(
-        manifest_path,
+    manifest = build_preprocessing_manifest(
         run_id=run_id,
         input_path=input_path,
         output_dir=output_dir,
@@ -505,7 +484,9 @@ def normalize_jsonl(
         shards=shards,
     )
 
-    elapsed = time.perf_counter() - start_time
+    write_manifest(manifest_path, manifest)
+
+    elapsed = timer.elapsed()
 
     print(f"run id: {run_id}")
     print(f"input: {input_path}")
@@ -519,15 +500,14 @@ def normalize_jsonl(
     else:
         print(f"rows counted: {total_rows:,}")
         print(f"estimated output bytes: {total_output_bytes:,}")
-        print(f"estimated MiB: {total_output_bytes / 1024 / 1024:.2f}")
+        print(f"estimated size: {format_bytes(total_output_bytes)}")
 
     print(f"bad json lines skipped: {skipped_bad_json:,}")
     print(f"non-object records skipped: {skipped_non_object:,}")
     print(f"empty lines skipped: {skipped_empty_lines:,}")
-
     print(f"elapsed seconds: {elapsed:.2f}")
-    print(f"records/sec: {total_records / elapsed:.1f}")
-    print(f"rows/sec: {total_rows / elapsed:.1f}")
+    print(f"records/sec: {format_rate(total_records, elapsed)}")
+    print(f"rows/sec: {format_rate(total_rows, elapsed)}")
 
 
 def main() -> None:
@@ -542,8 +522,8 @@ def main() -> None:
             --output-dir data/processed/normalized \
             --manifest data/processed/manifest.json
 
-    Byte-count only (no files written):
-        python parse_wiktionary.py \
+    Byte-count only:
+        python ./src/embeddings/parse_wiktionary.py \
             --input data/raw/wiktionary.jsonl \
             --output-dir /tmp/unused \
             --manifest /tmp/unused.json \
