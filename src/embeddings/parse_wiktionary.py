@@ -43,6 +43,7 @@ if str(REPO_ROOT) not in sys.path:
 
 from src.common.jsonl import jsonl_row_bytes, write_jsonl_row
 from src.common.logging_utils import ProgressTimer, format_bytes, format_rate
+from src.common.paths import update_latest_symlink
 from src.common.manifest import write_manifest
 from src.common.run_id import utc_now_iso, utc_run_id
 
@@ -370,7 +371,7 @@ def build_preprocessing_manifest(
 
 def normalize_jsonl(
     input_path: Path,
-    output_dir: Path,
+    output_root: Path,
     manifest_path: Path,
     shard_size: int,
     limit: int | None = None,
@@ -396,6 +397,9 @@ def normalize_jsonl(
 
     if run_id is None:
         run_id = utc_run_id()
+
+    output_dir = output_root / run_id
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     timer = ProgressTimer(progress_every=progress_every)
 
@@ -486,6 +490,9 @@ def normalize_jsonl(
 
     write_manifest(manifest_path, manifest)
 
+    if output_root is not None:
+        update_latest_symlink(output_root, run_id)
+
     elapsed = timer.elapsed()
 
     print(f"run id: {run_id}")
@@ -540,9 +547,9 @@ def main() -> None:
     )
 
     parser.add_argument(
-        "--output-dir",
-        required=True,
-        help="Directory where normalized JSONL shards will be written.",
+        "--output-root",
+        default=None,
+        help="Optional artifact root whose latest symlink should be updated after success.",
     )
 
     parser.add_argument(
@@ -588,7 +595,7 @@ def main() -> None:
 
     normalize_jsonl(
         input_path=Path(args.input),
-        output_dir=Path(args.output_dir),
+        output_root=Path(args.output_root),
         manifest_path=Path(args.manifest),
         shard_size=args.shard_size,
         limit=args.limit,

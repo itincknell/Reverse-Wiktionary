@@ -5,7 +5,6 @@ set -euo pipefail
 RAW_ROOT="data/raw"
 PROCESSED_ROOT="data/processed"
 RAW_LATEST_LINK="$RAW_ROOT/latest"
-PROCESSED_LATEST_LINK="$PROCESSED_ROOT/latest"
 TARGET_FILE="wiktionary.jsonl"
 
 if [ ! -e "$RAW_LATEST_LINK" ]; then
@@ -38,12 +37,9 @@ mkdir -p "$OUTDIR"
 
 python ./src/embeddings/parse_wiktionary.py \
   --input "$INPUT" \
-  --output-dir "$OUTDIR" \
+  --output-root "$PROCESSED_ROOT" \
   --manifest "$MANIFEST" \
   --run-id "$RUN_ID"
-
-rm -f "$PROCESSED_LATEST_LINK"
-ln -s "$RUN_ID" "$PROCESSED_LATEST_LINK"
 
 echo "=== Run Info ==="
 echo "source run id: $SOURCE_RUN_ID"
@@ -51,7 +47,6 @@ echo "process run id: $RUN_ID"
 echo "input: $INPUT"
 echo "output dir: $OUTDIR"
 echo "manifest: $MANIFEST"
-echo "processed latest link: $PROCESSED_LATEST_LINK"
 
 echo "=== Manifest Summary ==="
 jq '{
