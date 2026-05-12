@@ -148,5 +148,13 @@ az vm run-command invoke \
     modelName="$MODEL_NAME" \
     repoDir="$VM_REPO_DIR" \
     codeArchiveBlob="$CODE_ARCHIVE_BLOB" \
+    cloudRunId="$JOB_RUN_ID" \
     prepareProcessedIfMissing="$PREPARE_PROCESSED_IF_MISSING" \
     allowRawDownload="$ALLOW_RAW_DOWNLOAD"
+
+echo
+echo "=== Cloud Run Artifacts ==="
+echo "cloud run id: $JOB_RUN_ID"
+echo "code archive: $CONTAINER/$CODE_ARCHIVE_BLOB"
+echo "log: $CONTAINER/logs/$JOB_RUN_ID/remote_embedding_job.log"
+echo "status: $CONTAINER/logs/$JOB_RUN_ID/status.json"
