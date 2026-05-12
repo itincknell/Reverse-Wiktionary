@@ -63,20 +63,38 @@ class UpsertBatch:
     vectors: np.ndarray
 
 
-UpsertQueue = Queue[UpsertBatch | None]
-
-
-def make_upsert_queue(maxsize: int = 4) -> UpsertQueue:
+class UpsertQueue(Queue[UpsertBatch | None]):
     """
-    Create a bounded queue shared between embedding and Qdrant writer stages.
+    Queue wrapper with failure-aware drain behavior for the upsert worker.
 
-    A bounded queue provides backpressure so embedding cannot run arbitrarily
-    far ahead of database writes.
+    The standard Queue.join() blocks until every enqueued item has called
+    task_done(), but it cannot wake early if the only consumer exits after a
+    Qdrant failure. This wrapper keeps the normal backpressure semantics while
+    periodically surfacing worker exceptions to the producer thread.
     """
-    if maxsize <= 0:
-        raise ValueError("queue maxsize must be positive")
 
-    return Queue(maxsize=maxsize)
+    def wait_until_done_or_failed(
+        self,
+        worker: QdrantUpsertWorker,
+        poll_seconds: float = 0.1,
+    ) -> None:
+        """
+        Wait for all queued upserts to finish, or raise if the worker failed.
+
+        This intentionally replaces raw Queue.join() at shard boundaries. The
+        condition wait uses the same internal notification path as Queue.join(),
+        but with a timeout so the producer can check whether the background
+        writer has captured an exception.
+        """
+        while True:
+            worker.raise_if_failed()
+            with self.all_tasks_done:
+                if self.unfinished_tasks == 0:
+                    break
+
+                self.all_tasks_done.wait(timeout=poll_seconds)
+
+        worker.raise_if_failed()
 
 
 class QdrantWriter:

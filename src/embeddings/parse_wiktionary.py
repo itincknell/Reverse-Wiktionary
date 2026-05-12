@@ -526,13 +526,13 @@ def main() -> None:
     Full run:
         python ./src/embeddings/parse_wiktionary.py \
             --input data/raw/wiktionary.jsonl \
-            --output-dir data/processed/normalized \
+            --output-root data/processed \
             --manifest data/processed/manifest.json
 
     Byte-count only:
         python ./src/embeddings/parse_wiktionary.py \
             --input data/raw/wiktionary.jsonl \
-            --output-dir /tmp/unused \
+            --output-root /tmp \
             --manifest /tmp/unused.json \
             --count-bytes-only
     """
@@ -548,7 +548,7 @@ def main() -> None:
 
     parser.add_argument(
         "--output-root",
-        default=None,
+        default="data/processed",
         help="Optional artifact root whose latest symlink should be updated after success.",
     )
 

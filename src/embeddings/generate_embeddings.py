@@ -21,7 +21,9 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import time
 from pathlib import Path
+from queue import Full
 
 from qdrant_client.models import Distance
 
@@ -48,7 +50,7 @@ from src.embeddings.utils.qdrant_writer import (
     QdrantWriter,
     QdrantWriterConfig,
     UpsertBatch,
-    make_upsert_queue,
+    UpsertQueue,
 )
 from src.embeddings.utils.shard_reader import iter_source_rows, shard_id_from_path
 
@@ -103,6 +105,7 @@ def process_shard(
     shard_path: Path,
     model: EmbeddingModel,
     upsert_queue,
+    upsert_worker,
     encode_batch_size: int,
     progress_timer: ProgressTimer,
     total_state: dict[str, int],
@@ -134,12 +137,23 @@ def process_shard(
         texts = [source_row.embedding_text for source_row in source_batch]
         vectors = model.encode(texts, batch_size=encode_batch_size)
 
-        upsert_queue.put(
-            UpsertBatch(
-                source_rows=source_batch,
-                vectors=vectors,
-            )
-        )
+        # Preserve bounded-queue backpressure while still giving the producer a
+        # chance to notice if the background writer has failed.
+        while True:
+            upsert_worker.raise_if_failed()
+
+            try:
+                upsert_queue.put(
+                    UpsertBatch(
+                        source_rows=source_batch,
+                        vectors=vectors,
+                    ),
+                    timeout=0.1,
+                )
+                break
+            except Full:
+                time.sleep(0.1)
+                continue
 
         batch_size = len(source_batch)
         shard_rows += batch_size
@@ -268,7 +282,7 @@ def generate_embeddings(
 
     completed = completed_shard_ids(manifest)
 
-    upsert_queue = make_upsert_queue(maxsize=queue_size)
+    upsert_queue = UpsertQueue(maxsize=queue_size)
     upsert_worker = QdrantUpsertWorker(writer, upsert_queue)
     upsert_worker.start()
 
@@ -297,14 +311,14 @@ def generate_embeddings(
                 shard_path=shard_path,
                 model=model,
                 upsert_queue=upsert_queue,
+                upsert_worker=upsert_worker,
                 encode_batch_size=encode_batch_size,
                 progress_timer=timer,
                 total_state=total_state,
                 limit_rows_remaining=limit_rows,
             )
 
-            upsert_queue.join()
-            upsert_worker.raise_if_failed()
+            upsert_queue.wait_until_done_or_failed(upsert_worker)
 
             if shard_rows == 0:
                 print(f"[shard-empty] shard_id={shard_id} path={shard_path}")
@@ -326,7 +340,9 @@ def generate_embeddings(
             )
 
     finally:
-        upsert_queue.join()
+        # Drain any in-flight upserts before stopping the worker so successful
+        # batches are not abandoned, while still surfacing worker failures.
+        upsert_queue.wait_until_done_or_failed(upsert_worker)
         upsert_worker.stop()
         upsert_worker.raise_if_failed()
 
