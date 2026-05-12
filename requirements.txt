@@ -1,0 +1,4 @@
+numpy
+qdrant-client
+requests
+sentence-transformers
