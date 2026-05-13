@@ -13,8 +13,33 @@ PROCESSED_RUN_ID="latest"
 PREPARE_IF_MISSING=false
 ALLOW_RAW_DOWNLOAD=false
 
+write_remote_stage() {
+  local stage="$1"
+
+  if [ -n "${REVWIK_STAGE_FILE:-}" ]; then
+    cat > "$REVWIK_STAGE_FILE" <<EOF
+stage=$stage
+embedding_run_id=${REVWIK_EMBEDDING_RUN_ID:-}
+EOF
+  fi
+}
+
 usage() {
-  sed -n '5,32p' "$0"
+  cat <<'EOF'
+Ensure data/processed/latest exists for an embedding job.
+
+Required:
+  --storage-account NAME
+  --container NAME
+
+Optional:
+  --processed-run-id RUN_ID
+      Defaults to latest.
+  --prepare-if-missing
+      Prepare processed shards from raw Blob data when processed is missing.
+  --allow-raw-download
+      Allow Kaikki download if raw Blob artifacts are also missing.
+EOF
 }
 
 while [ "$#" -gt 0 ]; do
@@ -77,6 +102,7 @@ download_processed() {
 
 echo "=== Ensuring Processed Input ==="
 echo "processed run id: $PROCESSED_RUN_ID"
+write_remote_stage "ensuring_processed_input"
 
 if download_processed; then
   echo "Processed input is ready."
@@ -90,6 +116,7 @@ fi
 
 echo
 echo "Processed input not found. Preparing processed input from raw data."
+write_remote_stage "downloading_raw"
 
 if ! ./scripts/download_raw_from_blob.sh \
   --storage-account "$STORAGE_ACCOUNT" \
@@ -103,8 +130,10 @@ if ! ./scripts/download_raw_from_blob.sh \
 
   echo
   echo "Raw input not found in Blob. Downloading from Kaikki."
+  write_remote_stage "downloading_raw_from_kaikki"
   ./scripts/download_wiktionary_dump.sh --download-new
 
+  write_remote_stage "uploading_raw"
   ./scripts/upload_raw_to_blob.sh \
     --storage-account "$STORAGE_ACCOUNT" \
     --container "$CONTAINER"
@@ -112,10 +141,12 @@ fi
 
 echo
 echo "=== Running Preprocessing ==="
+write_remote_stage "normalizing"
 ./scripts/run_parse_wiktionary.sh
 
 echo
 echo "=== Uploading Prepared Processed Run ==="
+write_remote_stage "uploading_processed"
 ./scripts/upload_processed_to_blob.sh \
   --storage-account "$STORAGE_ACCOUNT" \
   --container "$CONTAINER"

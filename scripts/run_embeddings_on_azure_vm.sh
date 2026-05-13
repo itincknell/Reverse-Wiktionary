@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Start an existing Azure VM, run the embedding job remotely, upload the Qdrant
-# snapshot back to Blob Storage, and deallocate the VM when the command exits.
+# Start an existing Azure VM and submit the offline embedding job as a
+# background systemd unit. The VM is left running by default so the job can
+# continue after Azure Run Command returns. Deallocate the VM only after the
+# Blob status artifact reports a terminal state.
 
 RESOURCE_GROUP=""
 VM_NAME=""
@@ -12,7 +14,6 @@ PROCESSED_RUN_ID="latest"
 COLLECTION_NAME="reverse_wiktionary_v1"
 MODEL_NAME="sentence-transformers/all-mpnet-base-v2"
 VM_REPO_DIR="/opt/reverse-wiktionary"
-DEALLOCATE=true
 JOB_RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
 CODE_ARCHIVE_BLOB="code/$JOB_RUN_ID/repo.tar.gz"
 LOCAL_ARCHIVE=""
@@ -20,7 +21,32 @@ PREPARE_PROCESSED_IF_MISSING=false
 ALLOW_RAW_DOWNLOAD=false
 
 usage() {
-  sed -n '5,42p' "$0"
+  cat <<'EOF'
+Package the repo, upload it to Blob, and submit the offline embedding job to an
+existing Azure VM as a background systemd unit.
+
+Required:
+  --resource-group NAME
+  --vm-name NAME
+  --storage-account NAME
+  --container NAME
+
+Optional:
+  --processed-run-id RUN_ID
+      Defaults to latest.
+  --collection-name NAME
+      Defaults to reverse_wiktionary_v1.
+  --model-name NAME
+      Defaults to sentence-transformers/all-mpnet-base-v2.
+  --vm-repo-dir PATH
+      Defaults to /opt/reverse-wiktionary.
+  --prepare-processed-if-missing
+      Prepare processed shards from raw Blob data when processed is missing.
+  --allow-raw-download
+      Allow Kaikki download if both processed and raw Blob artifacts are missing.
+  --leave-running
+      Accepted for compatibility; the background job always requires the VM to stay running.
+EOF
 }
 
 while [ "$#" -gt 0 ]; do
@@ -58,7 +84,7 @@ while [ "$#" -gt 0 ]; do
       shift 2
       ;;
     --leave-running)
-      DEALLOCATE=false
+      # Accepted for compatibility with the earlier synchronous launcher.
       shift
       ;;
     --prepare-processed-if-missing)
@@ -95,14 +121,6 @@ cleanup() {
   if [ -n "$LOCAL_ARCHIVE" ]; then
     rm -f "$LOCAL_ARCHIVE"
   fi
-
-  if [ "$DEALLOCATE" = true ]; then
-    echo
-    echo "=== Deallocating VM ==="
-    az vm deallocate \
-      --resource-group "$RESOURCE_GROUP" \
-      --name "$VM_NAME"
-  fi
 }
 
 trap cleanup EXIT
@@ -117,6 +135,9 @@ tar -czf "$LOCAL_ARCHIVE" \
   --exclude ".DS_Store" \
   --exclude "data" \
   --exclude "revwik" \
+  --exclude ".venv" \
+  --exclude "qdrant_storage" \
+  --exclude "out" \
   --exclude "__pycache__" \
   .
 
@@ -134,12 +155,12 @@ az vm start \
   --name "$VM_NAME"
 
 echo
-echo "=== Running Remote Embedding Job ==="
+echo "=== Submitting Remote Embedding Job ==="
 az vm run-command invoke \
   --resource-group "$RESOURCE_GROUP" \
   --name "$VM_NAME" \
   --command-id RunShellScript \
-  --scripts @scripts/azure/run_embedding_job_remote.sh \
+  --scripts @scripts/azure/start_embedding_job_remote.sh \
   --parameters \
     storageAccount="$STORAGE_ACCOUNT" \
     container="$CONTAINER" \
@@ -158,3 +179,6 @@ echo "cloud run id: $JOB_RUN_ID"
 echo "code archive: $CONTAINER/$CODE_ARCHIVE_BLOB"
 echo "log: $CONTAINER/logs/$JOB_RUN_ID/remote_embedding_job.log"
 echo "status: $CONTAINER/logs/$JOB_RUN_ID/status.json"
+echo
+echo "Download live status:"
+echo "az storage blob download --account-name \"$STORAGE_ACCOUNT\" --container-name \"$CONTAINER\" --name \"logs/$JOB_RUN_ID/status.json\" --file /tmp/reverse-wiktionary-$JOB_RUN_ID-status.json --auth-mode login --overwrite && jq . /tmp/reverse-wiktionary-$JOB_RUN_ID-status.json"

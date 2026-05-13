@@ -215,8 +215,61 @@ Important fields:
 - `qdrant_url`: Qdrant HTTP endpoint used to create the snapshot.
 - `collection_name`: Qdrant collection snapshotted.
 - `blob_prefix`: Blob prefix used when uploaded.
+- `timeout_seconds`: Snapshot create/download timeout used by the run.
+- `poll_interval_seconds`: Poll interval used while waiting for snapshot metadata.
+- `reused_existing_snapshot`: Whether the run uploaded an already downloaded snapshot.
 - `snapshot_path`: Local snapshot path.
 - `snapshot_size_bytes`: Downloaded snapshot size.
+
+## Azure VM Job Status
+
+Producer: `scripts/azure/run_embedding_job_remote.sh`
+
+Path:
+
+```text
+logs/<cloud_run_id>/status.json
+```
+
+Important fields:
+
+- `cloud_run_id`: Azure launcher run identifier.
+- `embedding_run_id`: Embedding/index/snapshot run identifier, once allocated.
+- `started_at_utc`: Job start time.
+- `updated_at_utc`: Last status write time.
+- `finished_at_utc`: Terminal completion time, or `null` while running.
+- `stage`: Current stage.
+- `status`: `running`, `succeeded`, or `failed`.
+- `exit_code`: Process exit code for the latest status write.
+- `collection_name`: Qdrant collection being built.
+- `model_name`: SentenceTransformer model name.
+- `qdrant_status`: Current collection status when Qdrant is reachable.
+- `qdrant_points_count`: Current point count when Qdrant is reachable.
+- `qdrant_indexed_vectors_count`: Current indexed-vector count when reachable.
+- `qdrant_update_queue_length`: Current Qdrant update queue length when reachable.
+- `log_path`: Blob path to the streamed remote job log.
+- `embedding_manifest_path`: Blob path to the embedding manifest, once known.
+- `snapshot_prefix`: Blob prefix for uploaded Qdrant snapshot artifacts.
+
+Expected stage values include:
+
+```text
+starting
+preparing_repo
+installing_dependencies
+ensuring_processed_input
+downloading_raw
+downloading_raw_from_kaikki
+uploading_raw
+normalizing
+uploading_processed
+starting_qdrant
+embedding
+snapshotting
+uploading_snapshot
+uploading_embedding_manifest
+succeeded
+```
 
 ## Azure VM Job Contract
 
@@ -224,12 +277,16 @@ Launcher: `scripts/run_embeddings_on_azure_vm.sh`
 
 Remote job: `scripts/azure/run_embedding_job_remote.sh`
 
-The first version assumes the VM already exists and has:
+Bootstrap script: `scripts/azure/bootstrap_embedding_vm.sh`
+
+Snapshot-only rerun: `scripts/snapshot_qdrant_on_azure_vm.sh`
+
+The VM is expected to have:
 
 - Azure CLI authenticated with access to the storage account.
 - Docker and Docker Compose available.
 - `jq` available.
-- Python dependencies installed for this project.
+- Python 3 with `venv` available.
 
 The launcher uploads a lightweight repository archive to:
 
@@ -237,8 +294,13 @@ The launcher uploads a lightweight repository archive to:
 code/<run_id>/repo.tar.gz
 ```
 
-The VM job downloads and extracts that archive into `/opt/reverse-wiktionary`,
-or a custom path passed with `--vm-repo-dir`.
+The launcher submits a short Azure Run Command. That command extracts the repo
+archive into `/opt/reverse-wiktionary`, or a custom path passed with
+`--vm-repo-dir`, starts the real job as a background systemd unit, and exits.
+
+The background job creates `.venv`, installs `requirements.txt`, periodically
+uploads `logs/<cloud_run_id>/status.json`, and periodically uploads
+`logs/<cloud_run_id>/remote_embedding_job.log`.
 
 By default, the VM job reads `processed/latest.json`, downloads that processed
 run, and fails if processed input is missing. This keeps the embedding stage
@@ -255,3 +317,13 @@ Optional fallback flags:
 
 After processed input is ready, the VM job generates embeddings, snapshots
 Qdrant, uploads `indexes/<run_id>/`, and updates `indexes/latest.json`.
+
+If embedding succeeds but snapshot/upload fails, rerun only the snapshot stage
+with `scripts/snapshot_qdrant_on_azure_vm.sh`.
+
+Snapshot-only reruns write:
+
+```text
+logs/snapshot-<run_id>/status.json
+logs/snapshot-<run_id>/remote_snapshot_job.log
+```

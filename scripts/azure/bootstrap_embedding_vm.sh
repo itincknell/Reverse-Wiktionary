@@ -42,6 +42,10 @@ python -m pip install --upgrade pip
 systemctl enable docker
 systemctl start docker
 
+if id azureuser >/dev/null 2>&1; then
+  usermod -aG docker azureuser
+fi
+
 az version
 docker --version
 docker compose version

@@ -1,3 +1,8 @@
+# Direct runtime dependencies for the reverse Wiktionary pipeline.
+#
+# This is intentionally not a local pip freeze. The Azure VM runs Python 3.10,
+# while local development environments may resolve newer transitive packages
+# that are not installable on the VM.
 numpy
 qdrant-client
 requests
