@@ -7,9 +7,8 @@ uses UTC timestamp format:
 YYYYMMDDTHHMMSSZ
 ```
 
-Consumers should prefer manifests over directory inspection whenever possible.
-Consumers should also ignore unknown JSON fields so schemas can grow without
-breaking older scripts.
+Consumers should use manifests rather than directory inspection and ignore
+unknown JSON fields.
 
 ## Local Artifact Layout
 
@@ -28,8 +27,7 @@ data/embeddings/latest -> <run_id>
 data/indexes/<run_id>/
 ```
 
-The local `latest` symlink is an ergonomic pointer for scripts that run on a
-single filesystem. It is not uploaded to Blob Storage.
+The local `latest` symlink is not uploaded to Blob Storage.
 
 ## Blob Artifact Layout
 
@@ -50,9 +48,8 @@ indexes/<run_id>/
 indexes/latest.json
 ```
 
-Blob Storage does not support filesystem symlinks. The `latest.json` pointer
-files provide equivalent behavior without duplicating large shard or snapshot
-files.
+Blob `latest.json` pointer files replace local symlinks without duplicating
+large shard or snapshot files.
 
 ## Latest Pointer Schema
 
@@ -139,8 +136,8 @@ Optional fields:
 Compatibility rules:
 
 - Consumers must ignore unknown fields.
-- Producers should bump `SCHEMA_VERSION` before removing or renaming fields.
-- `embedding_text` is the model input contract; presentation fields should not
+- Producers bump `SCHEMA_VERSION` before removing or renaming fields.
+- `embedding_text` is the model input contract; presentation fields must not
   be reconstructed by consumers.
 
 ## Preprocessing Manifest
@@ -303,8 +300,7 @@ uploads `logs/<cloud_run_id>/status.json`, and periodically uploads
 `logs/<cloud_run_id>/remote_embedding_job.log`.
 
 By default, the VM job reads `processed/latest.json`, downloads that processed
-run, and fails if processed input is missing. This keeps the embedding stage
-reproducible and prevents surprise multi-GB downloads.
+run, and fails if processed input is missing.
 
 Optional fallback flags:
 

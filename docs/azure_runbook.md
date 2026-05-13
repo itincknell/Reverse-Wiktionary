@@ -344,18 +344,15 @@ az vm get-instance-view \
   --output tsv
 ```
 
-## First Cloud Run Fixes
+## 20260512 Run Notes
 
 ```bash
-# 20260512T203456Z failed during dependency install:
-# requirements.txt came from pip freeze on a newer local Python.
-# Fix: keep requirements.txt to direct runtime dependencies.
+# 20260512T203456Z: dependency install failed from local pip-freeze requirements.
+# resolution: requirements.txt contains direct runtime dependencies only.
 ```
 
 ```bash
-# 20260512T204458Z completed embeddings but failed around snapshot/finalization:
-# Azure Run Command timed out as the long-running job wrapper.
-# Qdrant snapshot creation used the old 600 second timeout.
-# Fix: background systemd job, periodic Blob status/log upload, 3600 second
-# snapshot timeout, and snapshot-only rerun script.
+# 20260512T204458Z: embeddings completed; original wrapper failed during Qdrant snapshot.
+# recovery: snapshot uploaded manually under indexes/20260512T204458Z.
+# follow-up: background systemd jobs, live Blob status/log upload, 3600s snapshot timeout.
 ```
