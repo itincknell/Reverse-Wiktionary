@@ -52,6 +52,7 @@ raw/<run_id>/
 raw/latest.json
 
 processed/<run_id>/
+processed/<run_id>/serving_metadata.json
 processed/latest.json
 
 code/<cloud_run_id>/
@@ -118,6 +119,18 @@ The parser filters low-value form/variant records, including `form_of`,
 and archaic senses. The parser keeps topical categories for future metadata
 work; they are not suppression rules.
 
+The preprocessing stage also writes:
+
+```text
+data/processed/<run_id>/serving_metadata.json
+processed/<run_id>/serving_metadata.json
+```
+
+This artifact records available language values and part-of-speech counts for
+the processed run. The web service fetches language values from Qdrant at
+startup for serving truth, but the offline metadata remains the deterministic
+pipeline contract and fallback.
+
 ## Embedding Generation
 
 Producer:
@@ -175,6 +188,16 @@ expansion
 
 The serving layer supports filters on `lang` and `pos`.
 
+Serving-ready Qdrant state requires payload indexes:
+
+```text
+lang: keyword
+pos: keyword
+```
+
+These indexes are created offline before web deployment so filtered search does
+not pay the index build cost during first public startup.
+
 ## Snapshot Recovery
 
 Qdrant snapshots are the deployable output of the offline pipeline.
@@ -202,11 +225,11 @@ runs/offline_embedding/20260512T204458Z/artifacts/index_manifest.json
 - Scripts must expose enough state to support manual recovery.
 - Root-created VM artifacts can interfere with SSH recovery; VM jobs must
   converge on a single runtime user before the next production run.
+- Serving deployment must use Qdrant storage outside the repository path.
 
 ## Deferred Work
 
 - Global deduplication across duplicate `(lang, word, pos)` records.
-- Payload indexes for serving filters.
 - Quantization and on-disk vector evaluation.
 - Automated restore test from `indexes/latest.json`.
 - Final cost/performance report after web serving benchmarks.

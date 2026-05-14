@@ -36,6 +36,10 @@ DEFAULT_COLLECTION_NAME = "reverse_wiktionary_test"
 
 @dataclass(frozen=True)
 class QualityCase:
+    """
+    One hand-authored query expectation for retrieval sanity checks.
+    """
+
     query: str
     expected_words: list[str]
     lang: str | None = "English"
@@ -218,6 +222,9 @@ def summarize(results: list[dict[str, Any]], top_k: int) -> dict[str, Any]:
 
 
 def main() -> None:
+    """
+    CLI entry point for retrieval-quality smoke checks.
+    """
     parser = argparse.ArgumentParser(
         description="Evaluate embedding retrieval quality with small sanity-check queries."
     )

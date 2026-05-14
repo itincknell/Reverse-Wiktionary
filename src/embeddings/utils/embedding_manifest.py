@@ -1,15 +1,8 @@
 """
 Embedding-run manifest helpers.
 
-This module owns:
-- embedding run metadata
-- completed shard tracking
-- resume state
-
-This module does not own:
-- Qdrant writes
-- embedding model internals
-- shard streaming
+The embedding manifest records the run configuration, completed shards, and
+aggregate progress needed for resume-safe indexing.
 """
 
 from __future__ import annotations

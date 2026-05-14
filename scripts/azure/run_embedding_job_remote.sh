@@ -338,6 +338,19 @@ set_stage "embedding"
   --run-id "$embeddingRunId" \
   --progress-every 100000
 
+set_stage "creating_payload_indexes"
+REVWIK_STAGE_FILE="$stateFile" \
+REVWIK_EMBEDDING_RUN_ID="$embeddingRunId" \
+  ./scripts/qdrant/create_payload_indexes.sh \
+  --collection-name "$collectionName" \
+  --qdrant-url http://localhost:6333
+
+REVWIK_STAGE_FILE="$stateFile" \
+REVWIK_EMBEDDING_RUN_ID="$embeddingRunId" \
+  ./scripts/qdrant/check_payload_indexes.sh \
+  --collection-name "$collectionName" \
+  --qdrant-url http://localhost:6333
+
 set_stage "snapshotting"
 REVWIK_STAGE_FILE="$stateFile" \
 REVWIK_EMBEDDING_RUN_ID="$embeddingRunId" \

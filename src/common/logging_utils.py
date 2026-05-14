@@ -1,9 +1,8 @@
 """
-Small logging and progress helpers for command-line pipeline scripts.
+Logging and progress helpers for command-line pipeline scripts.
 
-The project currently uses print-based progress reporting because the scripts
-are simple batch jobs. These helpers keep formatting consistent without adding a
-larger logging framework too early.
+The offline pipeline uses print-based progress reporting. These helpers keep
+rates, byte sizes, and periodic progress lines consistent across scripts.
 """
 
 from __future__ import annotations

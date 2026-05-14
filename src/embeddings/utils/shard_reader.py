@@ -1,17 +1,9 @@
 """
-Read normalized JSONL shards and yield deterministic embedding batches.
+Read processed JSONL shards and attach stable source metadata.
 
-This module owns:
-- shard discovery
-- JSONL streaming
-- row validation for embedding
-- deterministic source metadata
-- batch construction
-
-This module does not own:
-- embedding model loading
-- Qdrant upserts
-- run manifests
+The embedding stage uses this module to stream valid rows in deterministic shard
+order. `SourceRow` carries the shard ID and row index used later for stable
+Qdrant point IDs and recovery diagnostics.
 """
 
 from __future__ import annotations

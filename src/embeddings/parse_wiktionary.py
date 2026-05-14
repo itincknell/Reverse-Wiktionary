@@ -1,32 +1,17 @@
 #!/usr/bin/env python3
 
 """
-Normalize Wiktionary JSONL records into grouped word/POS/language rows.
+Normalize Wiktionary JSONL into sharded rows for semantic indexing.
 
-Each input line is a JSON object representing a Wiktionary entry.
-Each output line is a normalized row suitable for embedding.
+The parser streams raw Wiktextract records and emits one row per usable
+language/word/part-of-speech record. Glosses from kept senses are cleaned,
+deduplicated in order, and joined into `embedding_text`; word, language, part
+of speech, glosses, and optional headword expansion are retained for serving
+metadata.
 
-Key design decisions:
-- One output row per raw (language, word, part of speech) record
-- Glosses are aggregated across all senses in that record
-- Glosses are preserved as an ordered list after deduplication
-- Embedding text is constructed from joined cleaned glosses only
-- Output is written as deterministic JSONL shards
-- A manifest file records run-level and shard-level metadata
-- Invalid or incomplete records are skipped
-
-Important limitation:
-- This groups senses within a single raw record.
-- It does not perform a global group-by across multiple input records with the
-  same (lang, word, pos). That would require a second aggregation pass, sort,
-  SQLite/DuckDB, or another external grouping strategy.
-
-This script is designed to be:
-- Streaming (handles large files)
-- Fault-tolerant (skips malformed lines)
-- Deterministic (stable shard naming and row order)
-- Unicode-safe (UTF-8 input/output, non-ASCII preserved)
-- Resumable-friendly (manifest describes completed shards)
+Rows are not globally merged across duplicate `(lang, word, pos)` records. A
+global merge would require a second aggregation pass and is intentionally
+outside this streaming preprocessing step.
 """
 
 from __future__ import annotations
@@ -42,6 +27,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from src.common.jsonl import jsonl_row_bytes, write_jsonl_row
+from src.common.lexical_schema import ALLOWED_POS
 from src.common.logging_utils import ProgressTimer, format_bytes, format_rate
 from src.common.paths import update_latest_symlink
 from src.common.manifest import write_manifest
@@ -49,19 +35,7 @@ from src.common.run_id import utc_now_iso, utc_run_id
 
 
 SCHEMA_VERSION = "v4"
-
-
-ALLOWED_POS = {
-    "noun",
-    "verb",
-    "adj",
-    "adv",
-    "name",
-    "proper noun",
-    "phrase",
-    "proverb",
-    "idiom",
-}
+SERVING_METADATA_SCHEMA_VERSION = "v1"
 
 
 SKIP_SENSE_KEYS = {
@@ -347,6 +321,9 @@ def build_preprocessing_manifest(
     skipped_bad_json: int,
     skipped_non_object: int,
     skipped_empty_lines: int,
+    language_counts: dict[str, int],
+    pos_counts: dict[str, int],
+    serving_metadata_path: Path,
     shards: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """
@@ -365,7 +342,40 @@ def build_preprocessing_manifest(
         "skipped_bad_json": skipped_bad_json,
         "skipped_non_object": skipped_non_object,
         "skipped_empty_lines": skipped_empty_lines,
+        "language_count": len(language_counts),
+        "pos_counts": dict(sorted(pos_counts.items())),
+        "serving_metadata_path": str(serving_metadata_path),
         "shards": shards,
+    }
+
+
+def build_serving_metadata(
+    *,
+    run_id: str,
+    language_counts: dict[str, int],
+    pos_counts: dict[str, int],
+) -> dict[str, Any]:
+    """
+    Build the compact metadata artifact used by serving startup.
+
+    The web service can still derive metadata from Qdrant, but this artifact is
+    the deterministic offline contract for available filters and their counts.
+    """
+    languages = [
+        {"lang": lang, "rows": rows}
+        for lang, rows in sorted(language_counts.items(), key=lambda item: item[0].casefold())
+    ]
+
+    return {
+        "schema_version": SERVING_METADATA_SCHEMA_VERSION,
+        "processed_run_id": run_id,
+        "created_at_utc": utc_now_iso(),
+        "language_count": len(languages),
+        "languages": languages,
+        "pos": [
+            {"pos": pos, "rows": pos_counts.get(pos, 0)}
+            for pos in ALLOWED_POS
+        ],
     }
 
 
@@ -409,6 +419,8 @@ def normalize_jsonl(
     skipped_non_object = 0
     skipped_empty_lines = 0
     total_output_bytes = 0
+    language_counts: dict[str, int] = {}
+    pos_counts: dict[str, int] = {}
 
     writer = None if count_bytes_only else ShardWriter(output_dir=output_dir, shard_size=shard_size)
 
@@ -446,6 +458,8 @@ def normalize_jsonl(
                 for row in normalize_record(record):
                     total_rows += 1
                     total_output_bytes += jsonl_row_bytes(row)
+                    language_counts[row["lang"]] = language_counts.get(row["lang"], 0) + 1
+                    pos_counts[row["pos"]] = pos_counts.get(row["pos"], 0) + 1
 
                     if writer is not None:
                         writer.write_row(row)
@@ -475,6 +489,8 @@ def normalize_jsonl(
         print(f"rows/sec: {format_rate(total_rows, elapsed)}")
         return
 
+    serving_metadata_path = output_dir / "serving_metadata.json"
+
     manifest = build_preprocessing_manifest(
         run_id=run_id,
         input_path=input_path,
@@ -485,10 +501,20 @@ def normalize_jsonl(
         skipped_bad_json=skipped_bad_json,
         skipped_non_object=skipped_non_object,
         skipped_empty_lines=skipped_empty_lines,
+        language_counts=language_counts,
+        pos_counts=pos_counts,
+        serving_metadata_path=serving_metadata_path,
         shards=shards,
     )
 
+    serving_metadata = build_serving_metadata(
+        run_id=run_id,
+        language_counts=language_counts,
+        pos_counts=pos_counts,
+    )
+
     write_manifest(manifest_path, manifest)
+    write_manifest(serving_metadata_path, serving_metadata)
 
     if output_root is not None:
         update_latest_symlink(output_root, run_id)
@@ -512,6 +538,8 @@ def normalize_jsonl(
     print(f"bad json lines skipped: {skipped_bad_json:,}")
     print(f"non-object records skipped: {skipped_non_object:,}")
     print(f"empty lines skipped: {skipped_empty_lines:,}")
+    print(f"languages: {len(language_counts):,}")
+    print(f"serving metadata: {serving_metadata_path}")
     print(f"elapsed seconds: {elapsed:.2f}")
     print(f"records/sec: {format_rate(total_records, elapsed)}")
     print(f"rows/sec: {format_rate(total_rows, elapsed)}")

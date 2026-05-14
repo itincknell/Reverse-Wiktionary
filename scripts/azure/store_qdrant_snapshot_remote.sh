@@ -172,6 +172,17 @@ if [ "$startQdrant" = true ]; then
   qdrantStarted=true
 fi
 
+if [ "$reuseExisting" != true ]; then
+  stage="creating_payload_indexes"
+  ./scripts/qdrant/create_payload_indexes.sh \
+    --collection-name "$collectionName" \
+    --qdrant-url http://localhost:6333
+
+  ./scripts/qdrant/check_payload_indexes.sh \
+    --collection-name "$collectionName" \
+    --qdrant-url http://localhost:6333
+fi
+
 snapshot_args=(
   --collection-name "$collectionName"
   --run-id "$runId"

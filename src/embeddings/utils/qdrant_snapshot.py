@@ -1,18 +1,9 @@
 """
-Qdrant snapshot utilities.
+Qdrant collection snapshot utilities.
 
-Snapshots are portable collection backups created by Qdrant. They are safer to
-move between machines than copying the live Qdrant storage directory directly.
-
-This module owns:
-- collection snapshot creation
-- snapshot metadata lookup
-- snapshot download
-
-This module does not own:
-- Blob Storage upload
-- VM lifecycle
-- embedding generation
+Snapshots are portable backups created by Qdrant and are safer to move between
+machines than live storage directories. Blob upload and VM lifecycle management
+remain in the surrounding shell scripts.
 """
 
 from __future__ import annotations

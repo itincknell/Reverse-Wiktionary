@@ -1,17 +1,10 @@
 """
-Qdrant collection management and batch upserts.
+Qdrant collection management and deterministic batch upserts.
 
-This module owns:
-- collection creation/validation
-- deterministic point ID construction
-- payload construction
-- synchronous batch upserts
-- optional background upsert worker
-
-This module does not own:
-- SentenceTransformer encoding
-- shard iteration
-- run-level orchestration
+The writer creates or validates the target collection, converts normalized rows
+into Qdrant payloads, and assigns point IDs from source shard metadata. The
+optional background worker lets database writes overlap with later embedding
+batches while still surfacing failures to the producer thread.
 """
 
 from __future__ import annotations

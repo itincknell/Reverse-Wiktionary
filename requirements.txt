@@ -4,6 +4,11 @@
 # while local development environments may resolve newer transitive packages
 # that are not installable on the VM.
 numpy
+fastapi
+jinja2
+python-multipart
 qdrant-client
+redis
 requests
 sentence-transformers
+uvicorn

@@ -1,7 +1,7 @@
 # Web Serving Design
 
-The web service will serve natural-language reverse dictionary queries against
-the production Qdrant snapshot built by the offline indexing pipeline.
+The web service serves natural-language reverse dictionary queries against the
+production Qdrant collection built by the offline indexing pipeline.
 
 ## Architecture
 
@@ -9,57 +9,61 @@ the production Qdrant snapshot built by the offline indexing pipeline.
 Azure Blob Qdrant snapshot
   -> serving VM restore
   -> Qdrant container
-  -> search service
-  -> FastAPI web/API service
-  -> reverse proxy
-  -> public UI
+  -> FastAPI search/web service
+  -> Nginx reverse proxy
+  -> public UI and stable API
 ```
 
-## Serving Responsibilities
-
-The serving stack owns:
-
-- restoring the selected Qdrant snapshot
-- loading the query embedding model
-- validating search requests
-- applying language and part-of-speech filters
-- querying Qdrant
-- returning ranked lexical results
-- exposing health and operational checks
-
 The serving stack does not own preprocessing, embedding generation, or index
-construction.
+construction. It restores or connects to an existing collection and serves
+ranked lexical results.
+
+## Locked Decisions
+
+```text
+reverse proxy: Nginx
+server model: multiple sync FastAPI workers
+model placement: one SentenceTransformer model copy per worker
+session state: Redis with TTL
+result navigation: Load more button
+language list: fetched from Qdrant once at startup
+payload indexes: created offline before serving deployment
+production storage: stable host paths under /mnt/reverse-wiktionary
+API stability: public stable v1 API
+```
+
+The query layer is replicated inside each FastAPI worker. There is no central
+query queue. Each worker owns its model instance, Qdrant client, Redis client,
+and search service objects.
 
 ## Source Layout
 
 ```text
 src/search/        Qdrant query client and search orchestration.
 src/web/           FastAPI app, request models, templates, static assets.
-deploy/web/        Web Dockerfile, compose files, reverse proxy config.
+deploy/web/        Web Dockerfile, compose files, Nginx config.
 scripts/web/       Restore, deploy, health check, and smoke-test scripts.
+scripts/qdrant/    Payload-index creation and verification scripts.
 ```
 
-`src/search/` is independent of `src/embeddings/`. Embedding code writes the
-index; search code reads it.
+`src/search/` owns Qdrant read/query behavior. `src/embeddings/` owns
+preprocessing, embedding generation, and index construction.
 
-## API Surface
+## Stable API
 
 ```text
-GET  /health
-POST /api/search
-GET  /
-POST /ui/search
-POST /ui/filters
+POST /api/v1/search
 ```
 
-`POST /api/search` request:
+Request:
 
 ```json
 {
   "query": "a book listing words and their meanings",
-  "top_k": 20,
-  "langs": ["English"],
-  "pos": ["noun"]
+  "langs": [],
+  "pos": [],
+  "limit": 25,
+  "offset": 0
 }
 ```
 
@@ -68,6 +72,18 @@ Response:
 ```json
 {
   "query": "a book listing words and their meanings",
+  "filters": {
+    "langs": [],
+    "pos": []
+  },
+  "limit": 25,
+  "offset": 0,
+  "has_more": true,
+  "timing_ms": {
+    "embedding": 12.4,
+    "qdrant": 31.8,
+    "total": 47.2
+  },
   "results": [
     {
       "word": "dictionary",
@@ -81,19 +97,52 @@ Response:
 }
 ```
 
+Validation:
+
+```text
+query: required, trimmed, bounded string
+langs: optional list; empty means all languages
+pos: optional list; empty means all POS
+limit: default 25, max 100
+offset: default 0, non-negative
+```
+
+Filter semantics:
+
+```text
+multiple languages: OR
+multiple POS values: OR
+language filter AND POS filter
+no deduplication
+no grouping
+no reranking
+```
+
+## Web Routes
+
+```text
+GET  /
+POST /ui/search
+POST /ui/search/more
+GET  /health
+```
+
+`/ui/*` routes are implementation routes for the HTMX/Jinja UI. The stable
+programmatic contract is `/api/v1/search`.
+
 ## Query Path
 
 ```text
 request
-  -> validate query/top_k/filters
+  -> validate query/limit/offset/filters
   -> encode query text
   -> build Qdrant filter
   -> search Qdrant
   -> normalize response payloads
-  -> render JSON or HTML partial
+  -> return JSON or render HTML partial
 ```
 
-The web API uses the same embedding model family as the offline pipeline:
+The web service uses the same embedding model family as the offline pipeline:
 
 ```text
 sentence-transformers/all-mpnet-base-v2
@@ -110,26 +159,57 @@ HTMX
 plain CSS
 ```
 
-Primary page elements:
+UI behavior:
 
 ```text
-search input
-language filter
-part-of-speech filter
-ranked results
-result metadata
+default languages: all
+default POS: all
+initial page: no results
+search execution: explicit Search button only
+pagination: Load more button
+gloss display: first three glosses, show-more toggle for the rest
+expansion display: hidden by default, toggle when present
 ```
 
-Result fields:
+Result cards show:
 
 ```text
 word
 language
 part of speech
-score
 glosses
 expansion
 ```
+
+Scores are included in the API response and hidden in the normal UI.
+
+The language selector is a custom searchable multi-select populated from the
+Qdrant startup language cache. The POS selector uses the shared vocabulary from
+`src/common/lexical_schema.py`.
+
+## Session State
+
+Redis stores per-client UI state across multiple FastAPI workers.
+
+```text
+key: rw:session:<session_uuid>
+ttl: 86400 seconds
+```
+
+Stored fields:
+
+```text
+selected_langs
+selected_pos
+latest_query
+limit
+next_offset
+created_at_utc
+updated_at_utc
+```
+
+Result bodies are not stored in Redis. "Load more" reruns the latest
+query/filter state with the next offset.
 
 ## Deployment
 
@@ -139,20 +219,32 @@ Serving target:
 single Azure Linux VM
 Docker Compose
 Qdrant container
+Redis container
 FastAPI/web container
-Caddy or Nginx reverse proxy
+Nginx reverse proxy
 managed disk for Qdrant storage
 ```
 
-The serving VM is CPU-only unless latency testing proves otherwise.
-
-Target VM profile:
+Initial FastAPI worker count:
 
 ```text
-baseline: 4 vCPU, 16 GB RAM
-preferred if needed: 8 vCPU, 32 GB RAM
-disk: enough for restored Qdrant storage plus reindexing margin
+2 sync workers
 ```
+
+Worker count is a hardware and memory tuning decision because each worker loads
+its own model copy.
+
+Production host paths:
+
+```text
+/opt/reverse-wiktionary/app
+/mnt/reverse-wiktionary/qdrant/storage
+/mnt/reverse-wiktionary/redis/data
+/mnt/reverse-wiktionary/logs
+/mnt/reverse-wiktionary/snapshots
+```
+
+Production Qdrant storage must not live under the application repository.
 
 ## Restore Flow
 
@@ -161,8 +253,16 @@ read indexes/latest.json
 download indexes/<run_id>/manifest.json
 download snapshot from indexes/<run_id>/snapshots/
 restore Qdrant collection
+verify lang and pos payload indexes
 start web service
 verify /health
+```
+
+Serving snapshots should be prepared offline with payload indexes on:
+
+```text
+lang: keyword
+pos: keyword
 ```
 
 ## Health Checks
@@ -173,42 +273,56 @@ verify /health
 {
   "status": "ok",
   "qdrant": "ok",
-  "model": "loaded"
+  "redis": "ok",
+  "collection": "reverse_wiktionary_v1",
+  "model": "loaded",
+  "vector_size": 768,
+  "available_langs": 0,
+  "available_pos": 9
 }
 ```
 
-Operational scripts:
-
-```text
-restore snapshot
-start service
-stop service
-show logs
-health check
-disk usage
-```
+The endpoint returns non-200 when Qdrant, Redis, model loading, or the
+collection check fails.
 
 ## Metrics
 
-API logs:
+Per-search logs:
 
 ```text
 query_length
-top_k
-filters
+langs_count
+pos_count
+limit
+offset
 embedding_ms
 qdrant_ms
 total_ms
 result_count
+has_more
 ```
 
-These metrics will drive VM sizing and the final cost/performance writeup.
+Do not log full query text by default.
+
+## Implementation TODO
+
+```text
+1. Shared lexical constants.
+2. Offline payload-index scripts.
+3. Serving-ready snapshot flow.
+4. src/search core.
+5. Stable POST /api/v1/search.
+6. Redis-backed web session state.
+7. GET /health.
+8. Jinja/HTMX UI.
+9. Load-more pagination.
+10. Production Compose with Nginx, web, Redis, and Qdrant.
+```
 
 ## Deferred Work
 
-- Domain and HTTPS.
 - Rate limiting.
 - Result caching.
-- Payload indexes for common filters.
 - Query expansion or reranking.
+- Automatic infinite scroll.
 - Load testing dashboard.

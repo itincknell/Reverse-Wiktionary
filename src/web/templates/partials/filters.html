@@ -1,0 +1,40 @@
+<section class="filter-section">
+  <div class="section-heading">Languages</div>
+  <input
+    class="filter-search"
+    type="search"
+    placeholder="Filter languages"
+    data-filter-search="#language-options"
+  >
+  <div id="language-options" class="filter-options tall">
+    {% for lang in available_langs %}
+      <label class="check-row" data-filter-option="{{ lang|lower }}">
+        <input
+          type="checkbox"
+          name="langs"
+          value="{{ lang }}"
+          {% if lang in state.selected_langs %}checked{% endif %}
+        >
+        <span>{{ lang }}</span>
+      </label>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="filter-section">
+  <div class="section-heading">Parts of Speech</div>
+  <div class="filter-options">
+    {% for pos in available_pos %}
+      <label class="check-row" data-filter-option="{{ pos }}">
+        <input
+          type="checkbox"
+          name="pos"
+          value="{{ pos }}"
+          {% if pos in state.selected_pos %}checked{% endif %}
+        >
+        <span>{{ pos }}</span>
+      </label>
+    {% endfor %}
+  </div>
+</section>
+

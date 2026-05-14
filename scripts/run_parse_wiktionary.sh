@@ -54,6 +54,9 @@ jq '{
   rows_written,
   num_shards,
   shard_size,
+  language_count,
+  pos_counts,
+  serving_metadata_path,
   expansion_ratio: (.rows_written / .records_processed)
 }' "$MANIFEST"
 

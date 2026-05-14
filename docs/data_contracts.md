@@ -19,6 +19,7 @@ data/raw/<run_id>/
 data/raw/latest -> <run_id>
 
 data/processed/<run_id>/
+  serving_metadata.json
 data/processed/latest -> <run_id>
 
 data/embeddings/<run_id>/
@@ -38,6 +39,7 @@ raw/<run_id>/
 raw/latest.json
 
 processed/<run_id>/
+  serving_metadata.json
 processed/latest.json
 
 embeddings/<run_id>/
@@ -165,7 +167,35 @@ Important fields:
 - `skipped_bad_json`: Malformed JSON lines skipped.
 - `skipped_non_object`: Non-object JSON values skipped.
 - `skipped_empty_lines`: Empty input lines skipped.
+- `language_count`: Number of language values emitted into processed rows.
+- `pos_counts`: Row counts by allowed part-of-speech value.
+- `serving_metadata_path`: Local path to the serving metadata artifact.
 - `shards`: Per-shard metadata.
+
+## Processed Serving Metadata
+
+Producer: `src/embeddings/parse_wiktionary.py`
+
+Path:
+
+```text
+data/processed/<run_id>/serving_metadata.json
+processed/<run_id>/serving_metadata.json
+```
+
+Current schema: `v1`
+
+Important fields:
+
+- `schema_version`: Serving metadata schema version.
+- `processed_run_id`: Processed run identifier.
+- `created_at_utc`: Metadata creation time.
+- `language_count`: Number of language values represented.
+- `languages`: Objects with `lang` and `rows`.
+- `pos`: Objects with `pos` and `rows`.
+
+The web service uses Qdrant as serving truth at startup, but this metadata is
+the offline contract for expected filter values and row counts.
 
 ## Embedding Manifest
 
@@ -218,6 +248,22 @@ Important fields:
 - `snapshot_path`: Local snapshot path.
 - `snapshot_size_bytes`: Downloaded snapshot size.
 
+## Serving-Ready Qdrant Indexes
+
+Producer: `scripts/qdrant/create_payload_indexes.sh`
+
+Verifier: `scripts/qdrant/check_payload_indexes.sh`
+
+The serving collection must have keyword payload indexes for:
+
+```text
+lang
+pos
+```
+
+These indexes support filtered vector search for the stable public API and web
+UI. Serving snapshots should be created after the indexes exist.
+
 ## Azure VM Job Status
 
 Producer: `scripts/azure/run_embedding_job_remote.sh`
@@ -262,6 +308,7 @@ normalizing
 uploading_processed
 starting_qdrant
 embedding
+creating_payload_indexes
 snapshotting
 uploading_snapshot
 uploading_embedding_manifest

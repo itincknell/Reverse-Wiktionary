@@ -7,6 +7,7 @@ src/common/        Shared file, manifest, logging, and run-id helpers.
 src/embeddings/    Offline data preparation, embedding, Qdrant indexing code.
 scripts/           Local operational scripts.
 scripts/azure/     Azure VM bootstrap and remote execution scripts.
+scripts/qdrant/    Qdrant index management scripts.
 deploy/compose/    Local/runtime service compose files.
 docs/              Data contracts and operational runbooks.
 runs/              Small committed run records and metadata bundles.

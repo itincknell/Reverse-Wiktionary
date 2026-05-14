@@ -1,16 +1,9 @@
 """
-SentenceTransformer wrapper for embedding generation.
+SentenceTransformer wrapper used by offline embedding generation.
 
-This module owns:
-- model loading
-- device selection
-- text encoding
-- embedding dimension reporting
-
-This module does not own:
-- JSONL reading
-- Qdrant writes
-- manifest/checkpoint logic
+The wrapper centralizes model loading, device selection, normalization, and
+shape checks so the pipeline code can treat encoding as a stable batch
+operation.
 """
 
 from __future__ import annotations
