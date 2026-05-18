@@ -218,6 +218,15 @@ textarea:focus,
   padding-right: 4px;
 }
 
+.language-search-results {
+  display: grid;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+  border-top: 1px solid var(--line);
+  padding-top: 8px;
+}
+
 .check-row {
   display: flex;
   gap: 8px;

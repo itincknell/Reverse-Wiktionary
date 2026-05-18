@@ -127,5 +127,34 @@ function testAllExclusionWithBranchAddBack() {
   );
 }
 
+function testSearchOnlyLanguagesParticipateInAll() {
+  const state = new LanguageFilterState({
+    families,
+    allLanguages: [
+      { id: "english-flat", label: "English" },
+      { id: "akkadian", label: "Akkadian" },
+      { id: "sumerian", label: "Sumerian" },
+    ],
+  });
+
+  state.toggleAll();
+  assertDeepEqual(
+    submittedLabels(state),
+    ["Akkadian", "Dutch", "English", "German", "Japanese", "Okinawan", "Polish", "Russian", "Sumerian"],
+    "all includes search-only languages"
+  );
+
+  state.toggleLanguage("akkadian", false);
+  assertDeepEqual(
+    chipLabels(state),
+    ["All languages (- Akkadian)"],
+    "all can exclude search-only language"
+  );
+
+  state.toggleLanguage("akkadian", true);
+  assertDeepEqual(chipLabels(state), ["All languages"], "search-only language can be restored");
+}
+
 testFamilyExclusionWithLanguageAddBacks();
 testAllExclusionWithBranchAddBack();
+testSearchOnlyLanguagesParticipateInAll();

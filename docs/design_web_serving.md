@@ -212,7 +212,10 @@ present in `serving_metadata.json`.
 
 Language-tree metadata is built offline from processed `serving_metadata.json`
 plus Glottolog release data. The web UI consumes that artifact when available
-and falls back to the flat Qdrant language facet.
+and falls back to the flat Qdrant language facet. The browse tree is deliberately
+smaller than the full language universe: low-value singleton family paths are
+pruned from the tree, while the flat taxonomy language list still powers
+search-only matches, select-all, and submitted filter allowlists.
 
 ## Session State
 

@@ -230,8 +230,9 @@ Current schema: `v1`
 `language_taxonomy.json` stores:
 
 - `source`: Processed run and Glottolog source metadata.
-- `tree`: UI-ready `family -> branch -> languages` hierarchy.
-- `languages`: Flat enriched language records for debugging and future clients.
+- `tree`: UI-ready `family -> branch -> languages` browse hierarchy.
+- `languages`: Flat enriched language records; this remains the complete
+  language universe for search, select-all, and audit/debugging.
 
 Glottolog paths may contain arbitrary-depth family/group ancestors. The serving
 UI reduces those paths to stable display buckets:
@@ -243,10 +244,14 @@ Language = Wiktionary language label
 ```
 
 Unmatched, unclassifiable, artificial, bookkeeping, speech-register, and other
-non-language labels are retained in the flat debugging records but excluded
-from the filter tree. With no language filter, all Qdrant records remain
-eligible. Once any language filter is selected, the API receives an explicit
-language allowlist from the tree.
+non-language labels are retained in the flat records but excluded from the
+filter tree. Strict line-shaped families with one branch and one language are
+also pruned from the visible tree. These pruned languages remain searchable in
+the language filter and participate in select-all.
+
+With no language filter, all Qdrant records remain eligible. Once any language
+filter is selected, the API receives an explicit language allowlist assembled
+from the full flat language set, not only the visible browse tree.
 
 `language_taxonomy_unmatched.json` stores high-priority unmatched and
 review-needed labels, sorted by row count. `language_taxonomy_report.json`

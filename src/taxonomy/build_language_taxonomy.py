@@ -107,7 +107,7 @@ def build_taxonomy(
         for language in enriched_languages
         if is_selectable_language(language)
     ]
-    tree = build_tree(tree_languages)
+    tree, pruned_tree_languages = build_tree(tree_languages)
     top_families = top_counts(enriched_languages, "family")
     top_unmatched = sorted(
         unmatched,
@@ -130,8 +130,9 @@ def build_taxonomy(
         ),
         "review_languages": method_counts.get("fuzzy_review", 0),
         "unmatched_languages": method_counts.get("unmatched", 0),
-        "tree_languages": len(tree_languages),
-        "excluded_tree_languages": len(enriched_languages) - len(tree_languages),
+        "tree_languages": len(pruned_tree_languages),
+        "excluded_tree_languages": len(enriched_languages) - len(pruned_tree_languages),
+        "pruned_line_family_languages": len(tree_languages) - len(pruned_tree_languages),
         "method_counts": dict(sorted(method_counts.items())),
         "top_families": top_families,
         "top_unmatched": top_unmatched,
@@ -337,7 +338,14 @@ def is_selectable_language(language: dict[str, Any]) -> bool:
     return True
 
 
-def build_tree(languages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def build_tree(languages: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """
+    Build the browse tree and remove strict one-family/one-branch/one-language lines.
+
+    The flat taxonomy still keeps every language for direct search and
+    select-all behavior. The visible tree is only for useful browsing groups,
+    so isolated lineages with no real grouping value are pruned from it.
+    """
     families: dict[str, dict[str, Any]] = {}
 
     for language in languages:
@@ -359,10 +367,15 @@ def build_tree(languages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         branch["languages"].append(compact_language(language))
 
     tree: list[dict[str, Any]] = []
+    retained_labels: set[str] = set()
     for family in families.values():
         branches = list(family["branches"].values())
+        if len(branches) == 1 and len(branches[0]["languages"]) == 1:
+            continue
+
         for branch in branches:
             branch["languages"].sort(key=lambda item: item["label"].casefold())
+            retained_labels.update(language["label"] for language in branch["languages"])
         branches.sort(key=lambda item: item["branch"].casefold())
         tree.append(
             {
@@ -374,7 +387,12 @@ def build_tree(languages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         )
 
     tree.sort(key=lambda item: (-item["rows"], item["family"].casefold()))
-    return tree
+    retained_languages = [
+        language
+        for language in languages
+        if language["label"] in retained_labels
+    ]
+    return tree, retained_languages
 
 
 def compact_language(language: dict[str, Any]) -> dict[str, Any]:

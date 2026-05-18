@@ -26,6 +26,12 @@ def load_language_taxonomy(path: str | Path, fallback_languages: list[str]) -> d
 
 def normalize_taxonomy(raw: dict[str, Any]) -> dict[str, Any]:
     families = []
+    all_label_set = {
+        str(language.get("label") or "").strip()
+        for language in raw.get("languages", [])
+        if str(language.get("label") or "").strip()
+    }
+
     for family_index, raw_family in enumerate(raw.get("tree", [])):
         family_name = str(raw_family.get("family") or "Other")
         family_id = stable_id("family", family_name, family_index)
@@ -38,6 +44,7 @@ def normalize_taxonomy(raw: dict[str, Any]) -> dict[str, Any]:
                 language_node(language, family_id, branch_id, language_index)
                 for language_index, language in enumerate(raw_branch.get("languages", []))
             ]
+            all_label_set.update(language["label"] for language in languages if language["label"])
             branches.append(
                 {
                     "id": branch_id,
@@ -57,20 +64,20 @@ def normalize_taxonomy(raw: dict[str, Any]) -> dict[str, Any]:
         )
 
     families.sort(key=lambda item: (-item["sort_rows"], item["label"].casefold()))
-    return {"families": families}
+    all_labels = sorted(all_label_set, key=str.casefold)
+    return {
+        "families": families,
+        "all_languages": language_nodes_from_labels(all_labels),
+    }
 
 
 def flat_taxonomy(languages: list[str]) -> dict[str, Any]:
     family_id = stable_id("family", "Languages", 0)
     branch_id = stable_id("branch", "Languages", "All", 0)
+    sorted_languages = sorted(languages, key=str.casefold)
     language_nodes = [
-        {
-            "id": stable_id("language", label, index),
-            "label": label,
-            "family_id": family_id,
-            "branch_id": branch_id,
-        }
-        for index, label in enumerate(sorted(languages, key=str.casefold))
+        language_node_from_label(label, index, family_id=family_id, branch_id=branch_id)
+        for index, label in enumerate(sorted_languages)
     ]
     return {
         "families": [
@@ -87,7 +94,8 @@ def flat_taxonomy(languages: list[str]) -> dict[str, Any]:
                     }
                 ],
             }
-        ]
+        ],
+        "all_languages": language_nodes_from_labels(sorted_languages),
     }
 
 
@@ -110,3 +118,25 @@ def stable_id(*parts: object) -> str:
     raw = "::".join(str(part) for part in parts)
     slug = re.sub(r"[^a-z0-9]+", "-", raw.casefold()).strip("-")
     return slug or "item"
+
+
+def language_nodes_from_labels(labels: list[str]) -> list[dict[str, str]]:
+    return [
+        language_node_from_label(label, index)
+        for index, label in enumerate(labels)
+    ]
+
+
+def language_node_from_label(
+    label: str,
+    index: int,
+    *,
+    family_id: str = "",
+    branch_id: str = "",
+) -> dict[str, str]:
+    return {
+        "id": stable_id("language", label, index),
+        "label": label,
+        "family_id": family_id,
+        "branch_id": branch_id,
+    }

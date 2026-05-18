@@ -16,7 +16,7 @@
      * Pure selection model. This class has no DOM dependency, which keeps the
      * chip-collapse rules testable outside the browser.
      */
-    constructor({ families, initialSelectedLabels = [] }) {
+    constructor({ families, allLanguages = [], initialSelectedLabels = [] }) {
       this.languageById = new Map();
       this.languageIdByLabel = new Map();
       this.languagesByFamily = new Map();
@@ -28,6 +28,7 @@
       this.intentClock = 0;
 
       families.forEach((family) => this.addFamily(family));
+      this.addSearchOnlyLanguages(allLanguages);
 
       initialSelectedLabels.forEach((label) => {
         const languageId = this.languageIdByLabel.get(label);
@@ -67,6 +68,23 @@
           this.languagesByFamily.get(family.id).push(language.id);
           this.languagesByBranch.get(branch.id).push(language.id);
         });
+      });
+    }
+
+    addSearchOnlyLanguages(languages) {
+      languages.forEach((language) => {
+        if (!language.label || this.languageIdByLabel.has(language.label)) {
+          return;
+        }
+
+        this.languageById.set(language.id, {
+          id: language.id,
+          label: language.label,
+          family_id: "",
+          branch_id: "",
+          search_only: true,
+        });
+        this.languageIdByLabel.set(language.label, language.id);
       });
     }
 
@@ -252,6 +270,9 @@
 
       if (intent.type === "language") {
         const language = this.languageById.get(intent.id);
+        if (!language || language.search_only) {
+          return false;
+        }
         return this.selectionIntents.some((candidate) => {
           return (
             candidate.type === "family" &&
@@ -275,6 +296,9 @@
 
     coveringGroupIntent(languageId) {
       const language = this.languageById.get(languageId);
+      if (!language || language.search_only) {
+        return false;
+      }
       return this.selectionIntents.some((intent) => {
         return (
           (intent.type === "family" && intent.id === language.family_id) ||
@@ -285,6 +309,9 @@
 
     isInsidePartialAncestorSelection(languageId) {
       const language = this.languageById.get(languageId);
+      if (!language || language.search_only) {
+        return false;
+      }
       return this.selectionIntents.some((intent) => {
         if (intent.type === "all") {
           return this.selectedLanguages.size < this.languageById.size;
@@ -326,6 +353,15 @@
     submittedLanguages() {
       return Array.from(this.selectedLanguages)
         .map((languageId) => this.languageById.get(languageId))
+        .sort((left, right) => left.label.localeCompare(right.label));
+    }
+
+    searchOnlyLanguages(query) {
+      const normalizedQuery = query.toLowerCase();
+      return Array.from(this.languageById.values())
+        .filter((language) => {
+          return language.search_only && language.label.toLowerCase().includes(normalizedQuery);
+        })
         .sort((left, right) => left.label.localeCompare(right.label));
     }
 
@@ -444,15 +480,25 @@
      * DOM adapter for the language filter. It translates checkbox/search/chip
      * events into state transitions, then renders hidden form inputs and chips.
      */
-    constructor({ tree, chipList, emptyState, inputHost, selectAll, selectAllLabel }) {
+    constructor({
+      tree,
+      chipList,
+      emptyState,
+      inputHost,
+      selectAll,
+      selectAllLabel,
+      searchResults,
+    }) {
       this.tree = tree;
       this.chipList = chipList;
       this.emptyState = emptyState;
       this.inputHost = inputHost;
       this.selectAll = selectAll;
       this.selectAllLabel = selectAllLabel;
+      this.searchResults = searchResults;
       this.state = new LanguageFilterState({
         families: readFamiliesFromDom(tree),
+        allLanguages: JSON.parse(tree.dataset.allLanguages || "[]"),
         initialSelectedLabels: JSON.parse(tree.dataset.selectedLangs || "[]"),
       });
     }
@@ -472,24 +518,14 @@
 
       this.tree.addEventListener("change", (event) => {
         const target = event.target;
-
-        if (target.matches("[data-language-select-all]")) {
-          this.state.toggleAll();
-          this.syncUi();
-          return;
-        }
-
-        if (target.matches("[data-language-group]")) {
-          this.state.toggleGroup(target.dataset.languageGroup, target.dataset.groupId, target.checked);
-          this.syncUi();
-          return;
-        }
-
-        if (target.matches("[data-language-checkbox]")) {
-          this.state.toggleLanguage(target.dataset.languageId, target.checked);
-          this.syncUi();
-        }
+        this.handleLanguageChange(target);
       });
+
+      if (this.searchResults) {
+        this.searchResults.addEventListener("change", (event) => {
+          this.handleLanguageChange(event.target);
+        });
+      }
 
       document.addEventListener("input", (event) => {
         if (event.target.matches("[data-language-search]")) {
@@ -512,6 +548,25 @@
       this.syncUi();
     }
 
+    handleLanguageChange(target) {
+      if (target.matches("[data-language-select-all]")) {
+        this.state.toggleAll();
+        this.syncUi();
+        return;
+      }
+
+      if (target.matches("[data-language-group]")) {
+        this.state.toggleGroup(target.dataset.languageGroup, target.dataset.groupId, target.checked);
+        this.syncUi();
+        return;
+      }
+
+      if (target.matches("[data-language-checkbox], [data-language-search-checkbox]")) {
+        this.state.toggleLanguage(target.dataset.languageId, target.checked);
+        this.syncUi();
+      }
+    }
+
     syncUi() {
       this.syncCheckboxes();
       this.syncHiddenInputs();
@@ -522,6 +577,12 @@
       this.tree.querySelectorAll("[data-language-checkbox]").forEach((checkbox) => {
         checkbox.checked = this.state.selectedLanguages.has(checkbox.dataset.languageId);
       });
+
+      if (this.searchResults) {
+        this.searchResults.querySelectorAll("[data-language-search-checkbox]").forEach((checkbox) => {
+          checkbox.checked = this.state.selectedLanguages.has(checkbox.dataset.languageId);
+        });
+      }
 
       this.tree.querySelectorAll("[data-language-group]").forEach((checkbox) => {
         const ids = this.state.groupLanguageIds(checkbox.dataset.languageGroup, checkbox.dataset.groupId);
@@ -656,6 +717,44 @@
           details.open = true;
         }
       });
+
+      this.renderSearchOnlyMatches(query);
+    }
+
+    renderSearchOnlyMatches(query) {
+      if (!this.searchResults) {
+        return;
+      }
+
+      this.searchResults.innerHTML = "";
+      this.searchResults.hidden = !query;
+
+      if (!query) {
+        return;
+      }
+
+      const matches = this.state.searchOnlyLanguages(query).slice(0, 50);
+      if (matches.length === 0) {
+        this.searchResults.hidden = true;
+        return;
+      }
+
+      matches.forEach((language) => {
+        const row = document.createElement("label");
+        row.className = "check-row";
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.dataset.languageSearchCheckbox = "";
+        checkbox.dataset.languageId = language.id;
+        checkbox.value = language.label;
+        checkbox.checked = this.state.selectedLanguages.has(language.id);
+        row.appendChild(checkbox);
+
+        const label = document.createElement("span");
+        label.textContent = language.label;
+        row.appendChild(label);
+        this.searchResults.appendChild(row);
+      });
     }
   }
 
@@ -701,6 +800,7 @@
     const inputHost = document.querySelector("[data-language-inputs]");
     const selectAll = document.querySelector("[data-language-select-all]");
     const selectAllLabel = document.querySelector("[data-language-select-all-label]");
+    const searchResults = document.querySelector("[data-language-search-results]");
 
     if (!tree || !chipList || !inputHost) {
       return null;
@@ -713,6 +813,7 @@
       inputHost,
       selectAll,
       selectAllLabel,
+      searchResults,
     });
     controller.bind();
     return controller;

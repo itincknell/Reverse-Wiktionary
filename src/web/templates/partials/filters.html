@@ -18,6 +18,7 @@
     class="filter-options tall taxonomy-tree"
     data-language-tree
     data-selected-langs='{{ state.selected_langs|tojson }}'
+    data-all-languages='{{ language_taxonomy.all_languages|tojson }}'
   >
     <label class="check-row taxonomy-control" data-language-select-all-row>
       <input type="checkbox" data-language-select-all>
@@ -81,6 +82,11 @@
       </details>
     {% endfor %}
   </div>
+  <div
+    class="language-search-results"
+    data-language-search-results
+    hidden
+  ></div>
 </section>
 
 <section class="filter-section">
