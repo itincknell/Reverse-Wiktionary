@@ -9,8 +9,8 @@ RESOURCE_GROUP=""
 VM_NAME=""
 STORAGE_ACCOUNT=""
 CONTAINER=""
-COLLECTION_NAME="reverse_wiktionary_v1"
-MODEL_NAME="sentence-transformers/all-mpnet-base-v2"
+COLLECTION_NAME="reverse_wiktionary_v2"
+MODEL_NAME="sentence-transformers/distiluse-base-multilingual-cased-v2"
 QDRANT_HNSW_EF="64"
 QDRANT_ACORN_MAX_SELECTIVITY="1.0"
 SEARCH_EXACT_FILTERED="false"
@@ -31,9 +31,9 @@ Required:
 
 Optional:
   --collection-name NAME
-      Defaults to reverse_wiktionary_v1.
+      Defaults to reverse_wiktionary_v2.
   --model-name NAME
-      Defaults to sentence-transformers/all-mpnet-base-v2.
+      Defaults to sentence-transformers/distiluse-base-multilingual-cased-v2.
   --vm-repo-dir PATH
       Defaults to /opt/reverse-wiktionary-web-smoke.
   --qdrant-hnsw-ef N

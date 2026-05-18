@@ -1,7 +1,11 @@
 <article class="result-card">
   <header class="result-header">
     <div>
-      <h2>{{ result.word }}</h2>
+      <h2>
+        <a href="{{ result.wiktionary_url }}" target="_blank" rel="noopener noreferrer">
+          {{ result.word }}
+        </a>
+      </h2>
       <div class="metadata">{{ result.pos }}, {{ result.lang }}</div>
     </div>
 
@@ -30,4 +34,3 @@
     </details>
   {% endif %}
 </article>
-

@@ -64,8 +64,8 @@ def load_settings() -> WebSettings:
 
     return WebSettings(
         app_env=app_env,
-        collection_name=os.getenv("COLLECTION_NAME", "reverse_wiktionary_v1"),
-        model_name=os.getenv("MODEL_NAME", "sentence-transformers/all-mpnet-base-v2"),
+        collection_name=os.getenv("COLLECTION_NAME", "reverse_wiktionary_v2"),
+        model_name=os.getenv("MODEL_NAME", "sentence-transformers/distiluse-base-multilingual-cased-v2"),
         model_device=os.getenv("MODEL_DEVICE", "auto"),
         qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"),
         redis_url=os.getenv("REDIS_URL", "redis://localhost:6379/0"),

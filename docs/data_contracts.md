@@ -43,7 +43,9 @@ indexes/latest.json
 Expected serving collection:
 
 ```text
-collection_name: reverse_wiktionary_v1
+collection_name: reverse_wiktionary_v2
+model: sentence-transformers/distiluse-base-multilingual-cased-v2
+vector_size: 512
 distance: Cosine
 payload indexes: lang, pos
 quantization: scalar int8
@@ -79,6 +81,21 @@ Required fields:
 Optional fields:
 
 - `expansion`: Wiktionary head-template expansion when available.
+
+URL contract:
+
+- Qdrant payloads must not store full Wiktionary URLs.
+- The web/API layer derives result links from `word` and `lang`.
+- Spaces become underscores before percent-encoding.
+- Unicode is percent-encoded, not transliterated.
+
+Examples:
+
+```text
+café / French -> https://en.wiktionary.org/wiki/caf%C3%A9#French
+duo / Norwegian Bokmål -> https://en.wiktionary.org/wiki/duo#Norwegian_Bokm%C3%A5l
+褂 / Chinese -> https://en.wiktionary.org/wiki/%E8%A4%82#Chinese
+```
 
 ## Language Taxonomy Artifact
 

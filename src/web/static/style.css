@@ -363,6 +363,17 @@ textarea:focus,
   line-height: 1.2;
 }
 
+.result-header h2 a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.result-header h2 a:hover {
+  color: var(--accent-dark);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .metadata {
   margin-top: 3px;
   color: var(--muted);

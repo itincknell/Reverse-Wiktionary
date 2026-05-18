@@ -104,7 +104,8 @@ Response:
       "pos": "noun",
       "score": 0.82,
       "glosses": ["A reference work listing words..."],
-      "expansion": null
+      "expansion": null,
+      "wiktionary_url": "https://en.wiktionary.org/wiki/dictionary#English"
     }
   ]
 }
@@ -206,6 +207,10 @@ available and falls back to the flat Qdrant language facet. The visible browse
 tree may omit low-value singleton family paths; the flat `all_languages` list
 still powers search-only matches, select-all, and submitted filter allowlists.
 
+Result cards link to English Wiktionary pages. Links are computed locally from
+the lean payload fields `word` and `lang`; the serving path does not call
+Wiktionary or store duplicate URL fields in Qdrant.
+
 ## Session State
 
 Redis stores per-client UI state across multiple FastAPI workers.
@@ -299,7 +304,7 @@ logs/web_smoke/<run_id>/web.log
 
 ## Sizing Notes
 
-May 2026 live tests on the 768-dimensional production collection showed:
+May 2026 live tests on the 768-dimensional v1 collection showed:
 
 ```text
 Qdrant version: 1.18.0
@@ -322,9 +327,9 @@ disk: 64 GiB Standard SSD OS disk
 estimated cost: about $60/mo
 ```
 
-The next offline artifact set should use 512-dimensional vectors with scalar
-int8 quantization before snapshotting. That should reduce vector-sized storage
-and cache pressure by about one third while keeping the product scope intact.
+The v2 artifact set uses 512-dimensional vectors with scalar int8 quantization
+before snapshotting. That should reduce vector-sized storage and cache pressure
+by about one third while keeping the product scope intact.
 
 Committed run summaries:
 
@@ -342,9 +347,9 @@ runs/web_serving/20260518-quantized-sizing.md
   "status": "ok",
   "qdrant": "ok",
   "redis": "ok",
-  "collection": "reverse_wiktionary_v1",
+  "collection": "reverse_wiktionary_v2",
   "model": "loaded",
-  "vector_size": 768,
+  "vector_size": 512,
   "available_langs": 0,
   "available_pos": 9,
   "language_taxonomy_families": 0,

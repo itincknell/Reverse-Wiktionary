@@ -110,6 +110,7 @@ class SearchResult(BaseModel):
     score: float
     glosses: list[str]
     expansion: str | None = None
+    wiktionary_url: str
 
 
 class SearchResponse(BaseModel):

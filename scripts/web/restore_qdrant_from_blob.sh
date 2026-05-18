@@ -3,7 +3,7 @@ set -euo pipefail
 
 storageAccount=""
 container=""
-collectionName="${COLLECTION_NAME:-reverse_wiktionary_v1}"
+collectionName="${COLLECTION_NAME:-reverse_wiktionary_v2}"
 dataRoot="${REVERSE_WIKTIONARY_DATA_ROOT:-/opt/reverse-wiktionary/data}"
 qdrantUrl="${QDRANT_URL:-http://127.0.0.1:6333}"
 runId=""

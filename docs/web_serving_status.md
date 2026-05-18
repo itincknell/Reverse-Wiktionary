@@ -62,8 +62,8 @@ data disk: none
 estimated cost: about $60/mo
 ```
 
-The next offline artifact set is expected to use 512-dimensional embeddings and
-scalar int8 quantization before snapshotting.
+The v2 offline artifact set uses 512-dimensional embeddings and scalar int8
+quantization before snapshotting.
 
 ## Operational Checks
 

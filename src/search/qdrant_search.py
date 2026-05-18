@@ -11,6 +11,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import AcornSearchParams, Filter, SearchParams
 
 from src.search.filters import build_qdrant_filter
+from src.search.links import wiktionary_url
 from src.search.schemas import SearchFilters, SearchResult
 
 
@@ -142,9 +143,12 @@ class QdrantSearchClient:
         if not isinstance(glosses, list):
             glosses = []
 
+        word = str(payload.get("word") or "")
+        lang = str(payload.get("lang") or "")
+
         return SearchResult(
-            word=str(payload.get("word") or ""),
-            lang=str(payload.get("lang") or ""),
+            word=word,
+            lang=lang,
             pos=str(payload.get("pos") or ""),
             score=float(point.score),
             glosses=[str(gloss) for gloss in glosses if isinstance(gloss, str)],
@@ -153,4 +157,5 @@ class QdrantSearchClient:
                 if payload.get("expansion") is not None
                 else None
             ),
+            wiktionary_url=wiktionary_url(word, lang),
         )
