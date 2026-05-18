@@ -255,7 +255,7 @@ managed disk for Qdrant storage
 Initial FastAPI worker count:
 
 ```text
-2 sync workers
+1 sync worker on 2-vCPU beta hosts
 ```
 
 Worker count is a hardware and memory tuning decision because each worker loads
@@ -310,7 +310,8 @@ lang: keyword
 pos: keyword
 ```
 
-May 2026 smoke benchmarks on the production collection showed:
+May 2026 smoke benchmarks on the production collection before quantization
+showed:
 
 ```text
 Qdrant version: 1.18.0
@@ -322,13 +323,27 @@ French-filtered API, concurrency 4: 27.64 rps, p95 203.02 ms
 
 Serving memory was dominated by Qdrant: about 13.6 GiB RSS for the collection,
 plus about 1.5 GiB for one web worker/model process. The T4 GPU was not used
-for serving. The initial deployment target is therefore a single CPU VM around
-4 vCPU / 32 GiB RAM, with final confirmation on the selected VM size.
+for serving.
+
+Scalar int8 quantization with original vectors on disk preserved manual result
+quality and reduced Qdrant Docker memory to about 3.3 GiB during the follow-up
+benchmark. This changed the beta target from a 32 GiB host to a lean CPU VM:
+
+```text
+target VM: Standard_D2as_v5
+CPU/RAM: 2 vCPU / 8 GiB
+disk: 256 GiB Standard SSD
+estimated 24/7 cost: about $82/month including disk
+```
+
+The fallback for more memory headroom is `Standard_E2as_v5` with 2 vCPU /
+16 GiB RAM.
 
 Committed run summary:
 
 ```text
 runs/web_serving/20260518-acorn-sizing.md
+runs/web_serving/20260518-quantized-sizing.md
 ```
 
 ## Health Checks

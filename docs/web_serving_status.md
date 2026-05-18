@@ -14,6 +14,7 @@ pagination: Load more button
 language source: Qdrant facet at startup, taxonomy artifact when available
 payload indexes: lang and pos keyword indexes created before serving
 filtered retrieval: Qdrant ACORN, max_selectivity=1.0
+serving memory: scalar int8 quantization with original vectors on disk
 storage: stable host paths under /mnt/reverse-wiktionary
 API: stable public /api/v1/search
 ```
@@ -37,20 +38,23 @@ API: stable public /api/v1/search
 no filters: hnsw_ef=512
 language or POS filters: hnsw_ef=512 + ACORN max_selectivity=1.0
 diagnostic override: SEARCH_EXACT_FILTERED=true
+serving collection: scalar int8 quantization, original vectors on disk
 ```
 
 Live evaluation showed that plain filtered HNSW degraded semantic quality for
 small filter subsets. ACORN restored filtered quality without application-side
-post-filtering.
+post-filtering. Follow-up testing showed scalar int8 quantization preserved
+manual retrieval quality while reducing Qdrant memory enough to test an
+8 GiB beta host.
 
 ## Remaining Before Public Deployment
 
-- Restore the serving-ready Qdrant snapshot on the final CPU VM.
-- Run the smoke benchmark on the final VM size and worker count.
+- Create and upload a quantized serving-ready Qdrant snapshot.
+- Restore the quantized snapshot on `Standard_D2as_v5`.
+- Run the smoke benchmark on the final VM size with one web worker.
 - Configure Nginx for the production domain and TLS.
 - Add request rate limiting.
 - Confirm artifact upload paths for final benchmark logs.
-- Stop or deallocate the GPU build VM after the final artifacts are captured.
 
 ## Operational Checks
 
