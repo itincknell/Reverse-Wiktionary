@@ -21,25 +21,15 @@ This repository does not own preprocessing, embedding generation, taxonomy
 construction, or snapshot creation. It restores or connects to existing serving
 artifacts and handles query traffic.
 
-## Runtime Baseline
+Runtime services run under Docker Compose on a single Azure Linux VM. The
+application container serves both the HTML UI and the stable API through
+FastAPI/Uvicorn. Qdrant serves the restored vector collection, Redis stores
+short-lived UI session state, Nginx terminates local HTTP for the Compose stack,
+and Cloudflare Tunnel provides the outbound-only public edge.
 
-```text
-reverse proxy: Nginx
-web framework: FastAPI
-query workers: Uvicorn workers, each with its own model instance
-session state: Redis with TTL
-result navigation: Load more button
-language list: Qdrant facet at startup plus taxonomy artifact when present
-payload indexes: included in the serving snapshot
-filtered search: Qdrant ACORN, max_selectivity=1.0
-production storage: /opt/reverse-wiktionary/data
-API stability: public stable v1 API
-public edge: Cloudflare Tunnel in front of Nginx
-```
-
-The query layer is replicated inside each FastAPI worker. There is no central
-query queue. Each worker owns its model instance, Qdrant client, Redis client,
-and search service objects.
+The serving repo treats the restored Qdrant snapshot and taxonomy metadata as
+immutable deployment inputs. Runtime code is responsible for validation,
+request handling, filtering, rendering, and operational checks.
 
 ## Source Layout
 
@@ -52,7 +42,7 @@ scripts/azure/     VM bootstrap and remote web smoke entrypoints.
 scripts/qdrant/    Serving-side Qdrant verification/tuning helpers.
 ```
 
-## Public Edge
+## Network Boundary
 
 The production Compose stack is private by default. Qdrant, Redis, and FastAPI
 are reachable only on Docker-internal networking. Nginx binds to
@@ -170,10 +160,15 @@ result_count
 filter counts
 ```
 
+Each FastAPI worker owns its model instance, Qdrant client, Redis client, and
+search service objects. There is no central query queue between web workers and
+Qdrant.
+
 Qdrant searches use configurable query-time `hnsw_ef`. Searches with language
 or POS filters enable Qdrant ACORN traversal with `max_selectivity=1.0`; this
 preserved filtered retrieval quality in live tests without moving filtering or
-reranking into application code.
+reranking into application code. Payload indexes are part of the serving
+snapshot.
 
 For diagnostics, `SEARCH_EXACT_FILTERED=true` switches filtered requests to
 exact Qdrant search.
@@ -288,7 +283,7 @@ start web service
 verify /health
 ```
 
-## Benchmarking
+## Operational Validation
 
 Serving latency testing uses `scripts/web/benchmark_search.py` with a fixed
 query set in `scripts/web/benchmark_queries.json`. The harness exercises API and
@@ -304,7 +299,7 @@ logs/web_smoke/<run_id>/benchmark_samples.json
 logs/web_smoke/<run_id>/web.log
 ```
 
-## Sizing Notes
+## Capacity Notes
 
 May 2026 live tests on the 768-dimensional v1 collection showed:
 
@@ -363,11 +358,3 @@ runs/web_serving/20260518-quantized-sizing.md
 
 The endpoint returns non-200 when Qdrant, Redis, model loading, or the
 collection check fails.
-
-## Remaining Deployment Work
-
-- Generate the condensed 512-dimensional serving snapshot in the offline repo.
-- Restore the serving snapshot on the North Central US beta VM.
-- Run web smoke and sizing benchmarks against the restored collection.
-- Configure the Cloudflare Tunnel hostname for the production domain.
-- Tune public-edge rate limiting after beta traffic tests.
