@@ -15,11 +15,13 @@ Azure Blob Qdrant snapshot
   -> public UI and stable API
 ```
 
+<img src="assets/deployment-serving-flow.svg" alt="Serving architecture" width="760">
+
 This repository does not own preprocessing, embedding generation, taxonomy
 construction, or snapshot creation. It restores or connects to existing serving
 artifacts and handles query traffic.
 
-## Locked Decisions
+## Runtime Baseline
 
 ```text
 reverse proxy: Nginx
@@ -60,7 +62,7 @@ require inbound VM rules for ports 80 or 443.
 
 Nginx applies a small request body limit, proxy timeouts, security headers, and
 modest request limiting keyed by `CF-Connecting-IP` when Cloudflare supplies it.
-The Azure NSG should allow SSH only from the operator IP during maintenance.
+The Azure NSG allows SSH only from the operator IP during maintenance.
 
 ## Stable API
 
@@ -176,7 +178,7 @@ reranking into application code.
 For diagnostics, `SEARCH_EXACT_FILTERED=true` switches filtered requests to
 exact Qdrant search.
 
-The web service must use the same embedding model and vector dimension as the
+The web service uses the same embedding model and vector dimension as the
 serving snapshot.
 
 ## UI
@@ -269,8 +271,8 @@ Production host paths:
 /opt/reverse-wiktionary/data/restore
 ```
 
-Production Qdrant storage must not live under the application repository or the
-Azure temporary disk.
+Production Qdrant storage lives outside the application repository and outside
+the Azure temporary disk.
 
 ## Restore Flow
 
@@ -328,8 +330,8 @@ estimated cost: about $60/mo
 ```
 
 The v2 artifact set uses 512-dimensional vectors with scalar int8 quantization
-before snapshotting. That should reduce vector-sized storage and cache pressure
-by about one third while keeping the product scope intact.
+before snapshotting. This reduces vector-sized storage and cache pressure by
+about one third while keeping the product scope intact.
 
 Committed run summaries:
 

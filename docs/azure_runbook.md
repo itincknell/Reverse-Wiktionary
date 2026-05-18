@@ -61,8 +61,8 @@ az vm create \
 
 ## Network Exposure
 
-Public web traffic enters through Cloudflare Tunnel. The VM should not expose
-Qdrant, Redis, FastAPI, or Nginx directly to the internet.
+Public web traffic enters through Cloudflare Tunnel. Qdrant, Redis, FastAPI,
+and Nginx are not exposed directly to the internet.
 
 ```bash
 MY_IP="$(curl -fsS https://ifconfig.me)"

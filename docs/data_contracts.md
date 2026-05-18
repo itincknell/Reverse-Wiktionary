@@ -25,7 +25,7 @@ Current schema: `v1`
 }
 ```
 
-Consumers should read `manifest_path` and ignore unknown fields.
+Consumers read `manifest_path` and ignore unknown fields.
 
 ## Qdrant Index Artifact
 
@@ -57,7 +57,7 @@ uses the restored collection as serving truth.
 
 ## Search Payload
 
-Each Qdrant point should expose the fields used by the API/UI:
+Each Qdrant point exposes the fields used by the API/UI:
 
 ```json
 {
@@ -75,7 +75,7 @@ Required fields:
 
 - `word`: display headword.
 - `lang`: language label used for filtering.
-- `pos`: part of speech; must be compatible with `src/common/lexical_schema.py`.
+- `pos`: part of speech compatible with `src/common/lexical_schema.py`.
 - `glosses`: ordered list of display glosses.
 
 Optional fields:
@@ -84,7 +84,7 @@ Optional fields:
 
 URL contract:
 
-- Qdrant payloads must not store full Wiktionary URLs.
+- Qdrant payloads do not store full Wiktionary URLs.
 - The web/API layer derives result links from `word` and `lang`.
 - Spaces become underscores before percent-encoding.
 - Unicode is percent-encoded, not transliterated.
@@ -123,7 +123,7 @@ runtime source of truth for which language labels are present in the collection.
 Important behavior:
 
 - The visible tree may omit very small or unresolved families.
-- `all_languages` must include every language label available for filter search
+- `all_languages` includes every language label available for filter search
   and "select all" semantics.
 - If the taxonomy artifact is absent, the web app falls back to a flat language
   list from Qdrant facets.
@@ -140,4 +140,4 @@ logs/web_smoke/<run_id>/
 ```
 
 Benchmark samples may include route, status, latency, and timing fields. They
-should not include raw user query text in production logs.
+do not include raw user query text in production logs.

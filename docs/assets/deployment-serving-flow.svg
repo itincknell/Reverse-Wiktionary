@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1410" height="700" viewBox="0 0 1410 700" role="img" aria-labelledby="title desc">
+  <title id="title">Reverse Wiktionary serving architecture</title>
+  <desc id="desc">Architecture diagram showing Azure Blob Storage artifacts, a single Azure serving VM running Qdrant, Redis, FastAPI, Nginx, and Cloudflare Tunnel, and public browser traffic entering through Cloudflare.</desc>
+  <defs>
+    <marker id="arrow-blue" markerWidth="6" markerHeight="6" refX="5.4" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M1,1 L5.4,3 L1,5 Z" fill="#486d8d" />
+    </marker>
+    <marker id="arrow-green" markerWidth="6" markerHeight="6" refX="5.4" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M1,1 L5.4,3 L1,5 Z" fill="#4d8261" />
+    </marker>
+    <marker id="arrow-teal" markerWidth="6" markerHeight="6" refX="5.4" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M1,1 L5.4,3 L1,5 Z" fill="#3c7f83" />
+    </marker>
+    <style>
+      .bg { fill: #fbfcfe; }
+      .panel { rx: 24; ry: 24; stroke-width: 2.4; }
+      .blob-panel { fill: #eef6fb; stroke: #98b6cb; }
+      .vm-panel { fill: #fff8e7; stroke: #c4a34a; }
+      .edge-panel { fill: #e9f7f6; stroke: #67a6a6; }
+      .card { rx: 16; ry: 16; stroke-width: 1.8; }
+      .blob-card { fill: #ffffff; stroke: #8dafc6; }
+      .vm-card { fill: #fffdf7; stroke: #b89335; }
+      .qdrant-card { fill: #eeeafd; stroke: #7b6bb5; }
+      .final-card { fill: #e3f2ea; stroke: #2f7657; stroke-width: 2.6; }
+      .edge-card { fill: #eefafa; stroke: #3c7f83; stroke-width: 2.4; }
+      .title { font: 700 52px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #22313f; }
+      .subtitle { font: 500 25px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #536577; }
+      .section { font: 700 34px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #263746; }
+      .label { font: 700 22px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #243444; }
+      .body { font: 500 19px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #4d5f70; }
+      .caption { font: 650 19px Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; fill: #455b6d; }
+      .arrow-artifact { fill: none; stroke: #486d8d; stroke-width: 3.2; marker-end: url(#arrow-blue); }
+      .arrow-runtime { fill: none; stroke: #4d8261; stroke-width: 3.2; marker-end: url(#arrow-green); }
+      .arrow-edge { fill: none; stroke: #3c7f83; stroke-width: 3.2; marker-end: url(#arrow-teal); }
+      .caption-box { rx: 12; ry: 12; stroke-width: 1.8; }
+      .caption-artifact { fill: #eef5fb; stroke: #7292ad; }
+      .caption-edge { fill: #eefafa; stroke: #67a6a6; }
+    </style>
+  </defs>
+
+  <rect class="bg" width="1410" height="700" />
+
+  <text class="title" x="72" y="80">Serving Architecture</text>
+  <text class="subtitle" x="72" y="114">github.com/Reverse-Wiktionary</text>
+
+  <rect class="panel blob-panel" x="72" y="166" width="310" height="420" />
+  <text class="section" x="112" y="236">Azure Blob</text>
+  <text class="subtitle" x="112" y="270">serving artifacts</text>
+
+  <rect class="card final-card" x="112" y="342" width="230" height="96" />
+  <text class="label" x="132" y="374">Qdrant snapshot</text>
+  <text class="body" x="132" y="402">collection artifact</text>
+
+  <rect class="card blob-card" x="112" y="470" width="230" height="96" />
+  <text class="label" x="132" y="502">Metadata</text>
+  <text class="body" x="132" y="530">taxonomy + manifest</text>
+
+  <rect class="panel vm-panel" x="470" y="132" width="600" height="542" />
+  <text class="section" x="518" y="194">Azure Serving VM</text>
+  <text class="subtitle" x="518" y="228">Docker Compose runtime</text>
+
+  <rect class="card qdrant-card" x="520" y="278" width="225" height="112" />
+  <text class="label" x="542" y="310">Qdrant</text>
+  <text class="body" x="542" y="338">restored vector index</text>
+  <text class="body" x="542" y="366">payload indices</text>
+
+  <rect class="card vm-card" x="805" y="278" width="215" height="112" />
+  <text class="label" x="827" y="310">Redis</text>
+  <text class="body" x="827" y="338">session state</text>
+  <text class="body" x="827" y="366">TTL-backed UI state</text>
+
+  <rect class="card vm-card" x="520" y="430" width="500" height="92" />
+  <text class="label" x="542" y="462">FastAPI web app</text>
+  <text class="body" x="542" y="490">query API, embedding, filtering, Jinja rendering</text>
+
+  <rect class="card edge-card" x="520" y="562" width="500" height="76" />
+  <text class="label" x="542" y="594">Nginx</text>
+  <text class="body" x="542" y="622">localhost proxy, security headers, request limits</text>
+
+  <rect class="card edge-card" x="1190" y="196" width="190" height="104" />
+  <text class="label" x="1210" y="228">Cloudflare</text>
+  <text class="body" x="1210" y="256">DNS + TLS</text>
+  <text class="body" x="1210" y="282">tunnel edge</text>
+
+  <rect class="card final-card" x="1190" y="450" width="190" height="104" />
+  <text class="label" x="1210" y="482">Browser</text>
+  <text class="body" x="1210" y="510">search UI</text>
+  <text class="body" x="1210" y="536">stable API clients</text>
+
+  <path class="arrow-artifact" d="M382 334 H512" />
+  <path class="arrow-artifact" d="M382 476 H512" />
+  <rect class="caption-box caption-artifact" x="392" y="374" width="112" height="62" />
+  <text class="caption" x="448" y="399" text-anchor="middle">restore</text>
+  <text class="caption" x="448" y="424" text-anchor="middle">artifacts</text>
+
+  <path class="arrow-runtime" d="M625 390 V422" />
+  <path class="arrow-runtime" d="M912 390 V422" />
+  <path class="arrow-runtime" d="M770 522 V554" />
+
+  <path class="arrow-edge" d="M1020 624 H1116 V240 H1182" />
+  <rect class="caption-box caption-edge" x="1052" y="432" width="116" height="66" />
+  <text class="caption" x="1110" y="458" text-anchor="middle">outbound</text>
+  <text class="caption" x="1110" y="484" text-anchor="middle">tunnel</text>
+
+  <path class="arrow-edge" d="M1285 300 V442" />
+</svg>

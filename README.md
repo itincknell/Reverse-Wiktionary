@@ -1,4 +1,4 @@
-# Reverse Wiktionary Serving Design
+# Reverse Wiktionary
 
 Reverse Wiktionary is a semantic lexical search app. This repository contains
 the online serving layer: FastAPI, Qdrant query integration, Redis-backed UI

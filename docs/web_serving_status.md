@@ -3,7 +3,7 @@
 This file tracks the serving phase. Architecture details live in
 `docs/design_web_serving.md`.
 
-## Decisions
+## Serving Baseline
 
 ```text
 repository role: online serving/deployment only
@@ -35,7 +35,7 @@ public edge: Cloudflare Tunnel in front of Nginx
 - Production Compose config with Docker-internal Qdrant/Redis/FastAPI,
   localhost-only Nginx, and optional Cloudflare Tunnel profile.
 
-## Current Retrieval Policy
+## Retrieval Policy
 
 ```text
 no filters: hnsw_ef configurable, beta default 64
@@ -48,7 +48,7 @@ Live evaluation showed that ACORN restored filtered-search quality without
 application-side post-filtering. Scalar int8 quantization preserved manual
 retrieval quality while reducing Qdrant memory enough to test 8 GiB hosts.
 
-## Current Sizing Direction
+## Sizing Direction
 
 Preferred low-cost beta target:
 
