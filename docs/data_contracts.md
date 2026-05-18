@@ -40,6 +40,9 @@ raw/latest.json
 
 processed/<run_id>/
   serving_metadata.json
+  language_taxonomy.json
+  language_taxonomy_unmatched.json
+  language_taxonomy_report.json
 processed/latest.json
 
 embeddings/<run_id>/
@@ -48,6 +51,8 @@ code/<run_id>/
 
 indexes/<run_id>/
 indexes/latest.json
+
+logs/web_smoke/<run_id>/
 ```
 
 Blob `latest.json` pointer files replace local symlinks without duplicating
@@ -113,6 +118,9 @@ raw/latest.json
 ## Processed Rows
 
 Producer: `src/embeddings/parse_wiktionary.py`
+
+Backfill producer for older processed runs:
+`scripts/taxonomy/backfill_serving_metadata_from_blob.sh`
 
 Consumers:
 
@@ -197,6 +205,56 @@ Important fields:
 The web service uses Qdrant as serving truth at startup, but this metadata is
 the offline contract for expected filter values and row counts.
 
+## Language Taxonomy
+
+Producer: `scripts/taxonomy/build_language_taxonomy_from_blob.sh`
+
+Input:
+
+```text
+processed/<run_id>/serving_metadata.json
+data/reference/glottolog/<version>/glottolog_languoid.csv
+src/taxonomy/language_taxonomy_overrides.json
+```
+
+Outputs:
+
+```text
+processed/<run_id>/language_taxonomy.json
+processed/<run_id>/language_taxonomy_unmatched.json
+processed/<run_id>/language_taxonomy_report.json
+```
+
+Current schema: `v1`
+
+`language_taxonomy.json` stores:
+
+- `source`: Processed run and Glottolog source metadata.
+- `tree`: UI-ready `family -> branch -> languages` hierarchy.
+- `languages`: Flat enriched language records for debugging and future clients.
+
+Glottolog paths may contain arbitrary-depth family/group ancestors. The serving
+UI reduces those paths to stable display buckets:
+
+```text
+Family = Glottolog root family or isolate bucket
+Branch = curated display branch, with second-ancestor fallback
+Language = Wiktionary language label
+```
+
+Unmatched, unclassifiable, artificial, bookkeeping, speech-register, and other
+non-language labels are retained in the flat debugging records but excluded
+from the filter tree. With no language filter, all Qdrant records remain
+eligible. Once any language filter is selected, the API receives an explicit
+language allowlist from the tree.
+
+`language_taxonomy_unmatched.json` stores high-priority unmatched and
+review-needed labels, sorted by row count. `language_taxonomy_report.json`
+stores aggregate match counts, top families, and the top unmatched candidates.
+
+The override map is the audit trail for Wiktionary labels that should not rely
+on fuzzy matching, including pseudo-language labels such as `Translingual`.
+
 ## Embedding Manifest
 
 Producer: `src/embeddings/generate_embeddings.py`
@@ -263,6 +321,23 @@ pos
 
 These indexes support filtered vector search for the stable public API and web
 UI. Serving snapshots should be created after the indexes exist.
+
+## Web Smoke Benchmark Artifacts
+
+Producer: `scripts/web/benchmark_search.py`
+
+Remote smoke runners upload durable benchmark records to:
+
+```text
+logs/web_smoke/<run_id>/benchmark.json
+logs/web_smoke/<run_id>/benchmark_samples.json
+logs/web_smoke/<run_id>/web.log
+```
+
+`benchmark.json` stores the aggregate report, including route set, language/POS
+filters, concurrency, throughput, latency percentiles, error counts, and API
+timing fields. `benchmark_samples.json` stores one record per request for
+later inspection.
 
 ## Azure VM Job Status
 

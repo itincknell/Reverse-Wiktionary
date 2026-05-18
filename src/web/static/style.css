@@ -21,28 +21,78 @@ body {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-.app-shell {
-  min-height: 100vh;
-  display: grid;
-  grid-template-rows: auto 1fr;
-}
-
-.app-header {
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: center;
   padding: 22px 32px;
   border-bottom: 1px solid var(--line);
   background: var(--panel);
 }
 
-.app-header h1 {
-  margin: 0;
+.brand-link {
+  color: var(--ink);
+  text-decoration: none;
   font-size: 28px;
   font-weight: 700;
 }
 
+.site-nav {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+}
+
+.site-nav a {
+  color: var(--accent-dark);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.site-nav a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.app-shell {
+  min-height: calc(100vh - 77px);
+}
+
 .workspace {
-  min-height: 0;
+  min-height: calc(100vh - 77px);
   display: grid;
   grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+}
+
+.content-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 48px 28px;
+}
+
+.content-page h1 {
+  margin: 0 0 18px;
+  font-size: 32px;
+}
+
+.content-page h2 {
+  margin: 28px 0 10px;
+  font-size: 20px;
+}
+
+.content-page p {
+  margin: 0 0 16px;
+  color: var(--ink);
+  font-size: 17px;
+  line-height: 1.6;
+  text-align: justify;
+}
+
+.content-page a {
+  color: var(--accent-dark);
+  font-weight: 700;
 }
 
 .controls {
@@ -89,13 +139,81 @@ textarea:focus,
   gap: 8px;
 }
 
+.selected-filters {
+  padding-top: 4px;
+}
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 30px;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 9px;
+  color: var(--accent-dark);
+  background: #eef6f4;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.filter-chip-complex {
+  cursor: default;
+}
+
+.filter-chip:hover {
+  border-color: var(--accent);
+  background: #e0efec;
+}
+
+.chip-exclusions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.chip-exclusion,
+.chip-remove {
+  border: 0;
+  padding: 0;
+  color: var(--accent-dark);
+  background: transparent;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chip-exclusion {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.chip-remove {
+  margin-left: 2px;
+}
+
+.chip-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .filter-options {
   display: grid;
   gap: 6px;
 }
 
 .filter-options.tall {
-  max-height: 240px;
+  max-height: 360px;
   overflow: auto;
   padding-right: 4px;
 }
@@ -107,6 +225,76 @@ textarea:focus,
   min-height: 28px;
   color: var(--ink);
   font-size: 14px;
+}
+
+.check-row.is-hidden {
+  display: none;
+}
+
+.taxonomy-tree {
+  gap: 4px;
+}
+
+.taxonomy-control {
+  padding: 4px 0;
+  font-weight: 700;
+}
+
+.taxonomy-family,
+.taxonomy-branch {
+  display: block;
+}
+
+.taxonomy-family.is-hidden,
+.taxonomy-branch.is-hidden {
+  display: none;
+}
+
+.taxonomy-family > summary,
+.taxonomy-branch > summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+}
+
+.taxonomy-family > summary::-webkit-details-marker,
+.taxonomy-branch > summary::-webkit-details-marker {
+  display: none;
+}
+
+.taxonomy-summary {
+  font-weight: 700;
+}
+
+.taxonomy-family > summary::before,
+.taxonomy-branch > summary::before {
+  content: "";
+  display: inline-block;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 6px solid var(--muted);
+  flex: 0 0 auto;
+  transition: transform 120ms ease;
+}
+
+.taxonomy-family[open] > summary::before,
+.taxonomy-branch[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.taxonomy-branches {
+  display: grid;
+  gap: 3px;
+  margin-left: 18px;
+}
+
+.taxonomy-languages {
+  display: grid;
+  gap: 3px;
+  margin-left: 24px;
 }
 
 .primary-button,
@@ -223,4 +411,3 @@ details summary {
     border-bottom: 1px solid var(--line);
   }
 }
-

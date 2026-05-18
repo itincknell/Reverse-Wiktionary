@@ -2,10 +2,6 @@
 
 {% block body %}
 <main class="app-shell">
-  <header class="app-header">
-    <h1>Reverse Wiktionary</h1>
-  </header>
-
   <section class="workspace">
     <aside class="controls">
       <form
@@ -24,11 +20,11 @@
           required
         >{{ state.latest_query or "" }}</textarea>
 
+        <button class="primary-button" type="submit">Search</button>
+
         <input type="hidden" name="limit" value="{{ state.limit }}">
 
         {% include "partials/filters.html" %}
-
-        <button class="primary-button" type="submit">Search</button>
       </form>
     </aside>
 
@@ -40,17 +36,9 @@
   </section>
 </main>
 
-<script src="https://unpkg.com/htmx.org@2.0.4"></script>
+<script src="{{ url_for('static', path='language_filters.js') }}"></script>
 <script>
-  document.querySelectorAll("[data-filter-search]").forEach((input) => {
-    input.addEventListener("input", () => {
-      const target = document.querySelector(input.dataset.filterSearch);
-      const query = input.value.trim().toLowerCase();
-      target.querySelectorAll("[data-filter-option]").forEach((option) => {
-        option.hidden = query && !option.dataset.filterOption.includes(query);
-      });
-    });
-  });
+  ReverseWiktionaryLanguageFilters.initializeLanguageFilters();
 </script>
+<script src="https://unpkg.com/htmx.org@2.0.4"></script>
 {% endblock %}
-

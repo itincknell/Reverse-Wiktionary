@@ -9,6 +9,9 @@ STORAGE_ACCOUNT=""
 CONTAINER=""
 COLLECTION_NAME="reverse_wiktionary_v1"
 MODEL_NAME="sentence-transformers/all-mpnet-base-v2"
+QDRANT_HNSW_EF="512"
+QDRANT_ACORN_MAX_SELECTIVITY="1.0"
+SEARCH_EXACT_FILTERED="false"
 VM_REPO_DIR="/opt/reverse-wiktionary-web-smoke"
 JOB_RUN_ID="$(date -u +%Y%m%dT%H%M%SZ)"
 CODE_ARCHIVE_BLOB="code/web-smoke-$JOB_RUN_ID/repo.tar.gz"
@@ -31,6 +34,12 @@ Optional:
       Defaults to sentence-transformers/all-mpnet-base-v2.
   --vm-repo-dir PATH
       Defaults to /opt/reverse-wiktionary-web-smoke.
+  --qdrant-hnsw-ef N
+      Query-time HNSW exploration parameter. Defaults to 512.
+  --qdrant-acorn-max-selectivity N
+      ACORN selectivity threshold for filtered searches. Defaults to 1.0.
+  --search-exact-filtered
+      Use exact Qdrant search for filtered searches.
 EOF
 }
 
@@ -63,6 +72,18 @@ while [ "$#" -gt 0 ]; do
     --vm-repo-dir)
       VM_REPO_DIR="$2"
       shift 2
+      ;;
+    --qdrant-hnsw-ef)
+      QDRANT_HNSW_EF="$2"
+      shift 2
+      ;;
+    --qdrant-acorn-max-selectivity)
+      QDRANT_ACORN_MAX_SELECTIVITY="$2"
+      shift 2
+      ;;
+    --search-exact-filtered)
+      SEARCH_EXACT_FILTERED="true"
+      shift
       ;;
     --help|-h)
       usage
@@ -99,12 +120,15 @@ LOCAL_ARCHIVE="$(mktemp).tar.gz"
 echo "=== Packaging Repo ==="
 echo "archive blob: $CONTAINER/$CODE_ARCHIVE_BLOB"
 
-tar -czf "$LOCAL_ARCHIVE" \
+LC_ALL=C COPYFILE_DISABLE=1 tar --no-xattrs -czf "$LOCAL_ARCHIVE" \
   --exclude ".git" \
   --exclude ".DS_Store" \
+  --exclude "._*" \
   --exclude "data" \
   --exclude "revwik" \
   --exclude ".venv" \
+  --exclude "tmp" \
+  --exclude "tree" \
   --exclude "qdrant_storage" \
   --exclude "out" \
   --exclude "__pycache__" \
@@ -137,10 +161,13 @@ az vm run-command invoke \
     repoDir="$VM_REPO_DIR" \
     collectionName="$COLLECTION_NAME" \
     modelName="$MODEL_NAME" \
+    qdrantHnswEf="$QDRANT_HNSW_EF" \
+    qdrantAcornMaxSelectivity="$QDRANT_ACORN_MAX_SELECTIVITY" \
+    searchExactFiltered="$SEARCH_EXACT_FILTERED" \
     runId="$JOB_RUN_ID"
 
 echo
 echo "=== Web Smoke Complete ==="
 echo "run id: $JOB_RUN_ID"
 echo "code archive: $CONTAINER/$CODE_ARCHIVE_BLOB"
-
+echo "benchmark artifacts: $CONTAINER/logs/web_smoke/$JOB_RUN_ID"

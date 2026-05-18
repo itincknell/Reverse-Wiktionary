@@ -11,6 +11,8 @@ data/
 /revwik/
 /out
 /e
+/tmp/
+/tree
 
 # Distribution / packaging
 .Python

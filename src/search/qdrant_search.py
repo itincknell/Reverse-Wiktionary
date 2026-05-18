@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import Filter
+from qdrant_client.models import AcornSearchParams, Filter, SearchParams
 
 from src.search.filters import build_qdrant_filter
 from src.search.schemas import SearchFilters, SearchResult
@@ -22,6 +22,9 @@ class QdrantSearchConfig:
 
     url: str
     collection_name: str
+    hnsw_ef: int | None = 512
+    acorn_max_selectivity: float = 1.0
+    exact_filtered: bool = False
     language_facet_limit: int = 10_000
     request_timeout_seconds: int = 30
 
@@ -92,6 +95,7 @@ class QdrantSearchClient:
             collection_name=self.config.collection_name,
             query=vector,
             query_filter=query_filter,
+            search_params=self.search_params(filters),
             limit=limit,
             offset=offset,
             with_payload=True,
@@ -102,6 +106,34 @@ class QdrantSearchClient:
             self._normalize_result(point)
             for point in response.points
         ]
+
+    def search_params(self, filters: SearchFilters) -> SearchParams | None:
+        """
+        Return query-time retrieval settings.
+
+        Unfiltered searches use normal HNSW. Filtered searches use Qdrant's
+        ACORN traversal to preserve recall when payload filters make the HNSW
+        neighborhood sparse. `exact_filtered` is a testing override for quality
+        comparisons, not the default serving mode.
+        """
+        has_filters = bool(filters.langs or filters.pos)
+
+        if has_filters and self.config.exact_filtered:
+            return SearchParams(exact=True)
+
+        if has_filters:
+            return SearchParams(
+                hnsw_ef=self.config.hnsw_ef,
+                acorn=AcornSearchParams(
+                    enable=True,
+                    max_selectivity=self.config.acorn_max_selectivity,
+                ),
+            )
+
+        if self.config.hnsw_ef is None:
+            return None
+
+        return SearchParams(hnsw_ef=self.config.hnsw_ef)
 
     @staticmethod
     def _normalize_result(point: Any) -> SearchResult:

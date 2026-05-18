@@ -40,10 +40,12 @@ and search service objects.
 
 ```text
 src/search/        Qdrant query client and search orchestration.
-src/web/           FastAPI app, request models, templates, static assets.
+src/web/           FastAPI app, templates, static assets, session state.
+src/taxonomy/      Offline serving taxonomy builders and Glottolog matching.
 deploy/web/        Web Dockerfile, compose files, Nginx config.
 scripts/web/       Restore, deploy, health check, and smoke-test scripts.
 scripts/qdrant/    Payload-index creation and verification scripts.
+scripts/taxonomy/  Taxonomy artifact builders for processed runs.
 ```
 
 `src/search/` owns Qdrant read/query behavior. `src/embeddings/` owns
@@ -113,7 +115,7 @@ Filter semantics:
 multiple languages: OR
 multiple POS values: OR
 language filter AND POS filter
-no deduplication
+repeated values are normalized and deduplicated
 no grouping
 no reranking
 ```
@@ -141,6 +143,26 @@ request
   -> normalize response payloads
   -> return JSON or render HTML partial
 ```
+
+Search logs include route-level timings without recording raw query text:
+
+```text
+embedding_ms
+qdrant_ms
+search_total_ms
+route_overhead_ms
+route_total_ms
+result_count
+filter counts
+```
+
+Qdrant searches use query-time `hnsw_ef=512` by default. Searches with language
+or POS filters additionally enable Qdrant ACORN traversal with
+`max_selectivity=1.0`; this preserved filtered retrieval quality in live tests
+without moving filtering or reranking into application code.
+
+For diagnostics, `SEARCH_EXACT_FILTERED=true` switches filtered requests to
+exact Qdrant search.
 
 The web service uses the same embedding model family as the offline pipeline:
 
@@ -184,8 +206,13 @@ expansion
 Scores are included in the API response and hidden in the normal UI.
 
 The language selector is a custom searchable multi-select populated from the
-Qdrant startup language cache. The POS selector uses the shared vocabulary from
-`src/common/lexical_schema.py`.
+offline taxonomy artifact when available. The POS selector uses the shared
+vocabulary from `src/common/lexical_schema.py`, narrowed at runtime to values
+present in `serving_metadata.json`.
+
+Language-tree metadata is built offline from processed `serving_metadata.json`
+plus Glottolog release data. The web UI consumes that artifact when available
+and falls back to the flat Qdrant language facet.
 
 ## Session State
 
@@ -258,11 +285,50 @@ start web service
 verify /health
 ```
 
+## Benchmarking
+
+Serving latency testing uses `scripts/web/benchmark_search.py` with a fixed
+query set in `scripts/web/benchmark_queries.json`. The harness exercises API and UI
+routes separately and reports latency percentiles, throughput, errors, and API
+search timing fields. It can also write per-request samples for later review.
+
+Remote smoke runs upload benchmark artifacts and the web log to:
+
+```text
+logs/web_smoke/<run_id>/benchmark.json
+logs/web_smoke/<run_id>/benchmark_samples.json
+logs/web_smoke/<run_id>/web.log
+```
+
+Cloud tuning should vary FastAPI worker count and request concurrency before
+selecting the serving VM size.
+
 Serving snapshots should be prepared offline with payload indexes on:
 
 ```text
 lang: keyword
 pos: keyword
+```
+
+May 2026 smoke benchmarks on the production collection showed:
+
+```text
+Qdrant version: 1.18.0
+points: 3,869,247
+unfiltered API, concurrency 4: 38.19 rps, p95 120.65 ms
+English-filtered API, concurrency 4: 23.18 rps, p95 233.97 ms
+French-filtered API, concurrency 4: 27.64 rps, p95 203.02 ms
+```
+
+Serving memory was dominated by Qdrant: about 13.6 GiB RSS for the collection,
+plus about 1.5 GiB for one web worker/model process. The T4 GPU was not used
+for serving. The initial deployment target is therefore a single CPU VM around
+4 vCPU / 32 GiB RAM, with final confirmation on the selected VM size.
+
+Committed run summary:
+
+```text
+runs/web_serving/20260518-acorn-sizing.md
 ```
 
 ## Health Checks
@@ -278,7 +344,11 @@ pos: keyword
   "model": "loaded",
   "vector_size": 768,
   "available_langs": 0,
-  "available_pos": 9
+  "available_pos": 9,
+  "language_taxonomy_families": 0,
+  "qdrant_hnsw_ef": 512,
+  "qdrant_acorn_max_selectivity": 1.0,
+  "search_exact_filtered": false
 }
 ```
 
@@ -290,6 +360,7 @@ collection check fails.
 Per-search logs:
 
 ```text
+route
 query_length
 langs_count
 pos_count
@@ -297,32 +368,20 @@ limit
 offset
 embedding_ms
 qdrant_ms
-total_ms
+search_total_ms
+route_overhead_ms
+route_total_ms
 result_count
 has_more
 ```
 
 Do not log full query text by default.
 
-## Implementation TODO
+## Remaining Deployment Work
 
-```text
-1. Shared lexical constants.
-2. Offline payload-index scripts.
-3. Serving-ready snapshot flow.
-4. src/search core.
-5. Stable POST /api/v1/search.
-6. Redis-backed web session state.
-7. GET /health.
-8. Jinja/HTMX UI.
-9. Load-more pagination.
-10. Production Compose with Nginx, web, Redis, and Qdrant.
-```
-
-## Deferred Work
-
-- Rate limiting.
-- Result caching.
-- Query expansion or reranking.
-- Automatic infinite scroll.
-- Load testing dashboard.
+- Restore the serving snapshot on the final CPU VM.
+- Run the web smoke benchmark on the final VM size.
+- Configure Nginx for the production domain and TLS.
+- Add rate limiting before public traffic.
+- Keep result caching, query expansion, reranking, and infinite scroll out of
+  the first deployment unless benchmark or user feedback justifies them.

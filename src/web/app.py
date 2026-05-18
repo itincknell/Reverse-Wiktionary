@@ -4,8 +4,10 @@ FastAPI application for Reverse Wiktionary serving.
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
+from time import perf_counter
 
 from fastapi import FastAPI, Form, Request, Response
 from fastapi.responses import HTMLResponse
@@ -19,6 +21,7 @@ from src.search.schemas import SearchRequest
 from src.search.service import SearchService
 from src.web.config import WebSettings, load_settings
 from src.web.state import SESSION_COOKIE, ClientSearchState, RedisSessionStore
+from src.web.taxonomy import load_language_taxonomy
 
 
 LOGGER = logging.getLogger(__name__)
@@ -34,11 +37,13 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     traffic.
     """
     settings = settings or load_settings()
+    _configure_logging(settings.log_level)
 
     app = FastAPI(title="Reverse Wiktionary", version="1.0.0")
     app.state.settings = settings
     app.state.available_langs = []
     app.state.available_pos = list(ALLOWED_POS)
+    app.state.language_taxonomy = {"families": []}
 
     templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
     app.state.templates = templates
@@ -64,6 +69,9 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             QdrantSearchConfig(
                 url=settings.qdrant_url,
                 collection_name=settings.collection_name,
+                hnsw_ef=settings.qdrant_hnsw_ef,
+                acorn_max_selectivity=settings.qdrant_acorn_max_selectivity,
+                exact_filtered=settings.search_exact_filtered,
             )
         )
         qdrant.verify_collection()
@@ -78,6 +86,11 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         app.state.search_service = SearchService(encoder=encoder, qdrant=qdrant)
         app.state.session_store = session_store
         app.state.available_langs = qdrant.available_languages()
+        app.state.language_taxonomy = load_language_taxonomy(
+            settings.language_taxonomy_path,
+            fallback_languages=app.state.available_langs,
+        )
+        app.state.available_pos = available_pos_from_metadata(settings.serving_metadata_path)
 
     @app.get("/health")
     def health() -> dict[str, object]:
@@ -101,16 +114,33 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             "vector_size": encoder.embedding_dimension,
             "available_langs": len(app.state.available_langs),
             "available_pos": len(app.state.available_pos),
+            "language_taxonomy_families": len(app.state.language_taxonomy["families"]),
+            "qdrant_hnsw_ef": settings.qdrant_hnsw_ef,
+            "qdrant_acorn_max_selectivity": settings.qdrant_acorn_max_selectivity,
+            "search_exact_filtered": settings.search_exact_filtered,
         }
+
+    @app.get("/about", response_class=HTMLResponse)
+    def about(request: Request) -> HTMLResponse:
+        """
+        Render the project/about page.
+        """
+        return templates.TemplateResponse("about.html", {"request": request})
 
     @app.post("/api/v1/search")
     def api_search(request: SearchRequest) -> dict[str, object]:
         """
         Stable public search API.
         """
+        route_started = perf_counter()
         response = app.state.search_service.search(request)
-        _log_search(response)
-        return response.model_dump()
+        payload = response.model_dump()
+        _log_search(
+            route="api.search",
+            search_response=response,
+            route_total_ms=_elapsed_ms(route_started),
+        )
+        return payload
 
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request) -> HTMLResponse:
@@ -121,11 +151,13 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         state = app.state.session_store.get(session_id, default_limit=settings.default_limit)
 
         template_response = templates.TemplateResponse(
-            "index.html",
-            {
+            request=request,
+            name="index.html",
+            context={
                 "request": request,
                 "state": state,
                 "available_langs": app.state.available_langs,
+                "language_taxonomy": app.state.language_taxonomy,
                 "available_pos": app.state.available_pos,
                 "results": [],
                 "has_more": False,
@@ -145,6 +177,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         """
         Execute a new UI search and replace the result pane.
         """
+        route_started = perf_counter()
         session_id, should_set_cookie = _get_or_create_session_id(request)
         search_request = SearchRequest(
             query=query,
@@ -154,7 +187,6 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             offset=0,
         )
         search_response = app.state.search_service.search(search_request)
-        _log_search(search_response)
 
         state = ClientSearchState(
             selected_langs=search_request.langs,
@@ -171,8 +203,9 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         app.state.session_store.save(session_id, state)
 
         template_response = templates.TemplateResponse(
-            "partials/results.html",
-            {
+            request=request,
+            name="partials/results.html",
+            context={
                 "request": request,
                 "results": search_response.results,
                 "has_more": search_response.has_more,
@@ -180,6 +213,11 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             },
         )
         _set_session_cookie(template_response, session_id, settings, should_set_cookie)
+        _log_search(
+            route="ui.search",
+            search_response=search_response,
+            route_total_ms=_elapsed_ms(route_started),
+        )
         return template_response
 
     @app.post("/ui/search/more", response_class=HTMLResponse)
@@ -187,13 +225,15 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         """
         Append the next page for the latest session query.
         """
+        route_started = perf_counter()
         session_id, should_set_cookie = _get_or_create_session_id(request)
         state = app.state.session_store.get(session_id, default_limit=settings.default_limit)
 
         if not state.latest_query:
             template_response = templates.TemplateResponse(
-                "partials/results.html",
-                {
+                request=request,
+                name="partials/results.html",
+                context={
                     "request": request,
                     "results": [],
                     "has_more": False,
@@ -211,14 +251,14 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             offset=state.next_offset,
         )
         search_response = app.state.search_service.search(search_request)
-        _log_search(search_response)
 
         state.next_offset = search_request.offset + search_request.limit
         app.state.session_store.save(session_id, state)
 
         template_response = templates.TemplateResponse(
-            "partials/result_items.html",
-            {
+            request=request,
+            name="partials/result_items.html",
+            context={
                 "request": request,
                 "results": search_response.results,
                 "has_more": search_response.has_more,
@@ -226,6 +266,11 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             },
         )
         _set_session_cookie(template_response, session_id, settings, should_set_cookie)
+        _log_search(
+            route="ui.search_more",
+            search_response=search_response,
+            route_total_ms=_elapsed_ms(route_started),
+        )
         return template_response
 
     return app
@@ -266,14 +311,87 @@ def _set_session_cookie(
     )
 
 
-def _log_search(search_response: object) -> None:
+def _elapsed_ms(started: float) -> float:
     """
-    Log aggregate request metrics without recording the raw query text.
+    Return elapsed milliseconds rounded for request logs.
     """
+    return round((perf_counter() - started) * 1000, 2)
+
+
+def available_pos_from_metadata(path: str) -> list[str]:
+    """
+    Return POS filters present in the current processed run.
+
+    The shared lexical schema remains the allowlist. Runtime metadata narrows
+    the visible UI filters to values that actually exist in the restored data.
+    """
+    metadata_path = Path(path)
+    if not metadata_path.exists():
+        return list(ALLOWED_POS)
+
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    counts = metadata.get("pos_counts") or metadata.get("pos") or []
+    if isinstance(counts, dict):
+        counts = [
+            {"pos": pos, "rows": rows}
+            for pos, rows in counts.items()
+        ]
+    present = {
+        str(item.get("pos"))
+        for item in counts
+        if isinstance(item, dict) and int(item.get("rows") or 0) > 0
+    }
+
+    if not present:
+        return list(ALLOWED_POS)
+
+    return [
+        pos
+        for pos in ALLOWED_POS
+        if pos in present
+    ]
+
+
+def _configure_logging(log_level: str) -> None:
+    """
+    Ensure application timing logs are emitted under Uvicorn.
+    """
+    level = getattr(logging, log_level.upper(), logging.INFO)
+
+    if not LOGGER.handlers:
+        handler = logging.StreamHandler()
+        handler.setFormatter(
+            logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s")
+        )
+        LOGGER.addHandler(handler)
+
+    LOGGER.setLevel(level)
+    LOGGER.propagate = False
+
+
+def _log_search(
+    *,
+    route: str,
+    search_response: object,
+    route_total_ms: float,
+) -> None:
+    """
+    Log aggregate request metrics without recording raw query text.
+
+    `route_overhead_ms` is route work outside the core search path. For UI
+    routes it includes session IO and template rendering; for API routes it is
+    the residual handler and serialization overhead.
+    """
+    route_overhead_ms = round(
+        max(route_total_ms - search_response.timing_ms.total, 0.0),
+        2,
+    )
+
     LOGGER.info(
-        "event=search query_length=%s langs_count=%s pos_count=%s limit=%s "
-        "offset=%s embedding_ms=%s qdrant_ms=%s total_ms=%s result_count=%s "
-        "has_more=%s",
+        "event=search route=%s query_length=%s langs_count=%s pos_count=%s "
+        "limit=%s offset=%s embedding_ms=%s qdrant_ms=%s search_total_ms=%s "
+        "route_overhead_ms=%s route_total_ms=%s result_count=%s has_more=%s",
+        route,
         len(search_response.query),
         len(search_response.filters.langs),
         len(search_response.filters.pos),
@@ -282,6 +400,8 @@ def _log_search(search_response: object) -> None:
         search_response.timing_ms.embedding,
         search_response.timing_ms.qdrant,
         search_response.timing_ms.total,
+        route_overhead_ms,
+        route_total_ms,
         len(search_response.results),
         search_response.has_more,
     )

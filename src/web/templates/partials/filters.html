@@ -1,22 +1,84 @@
+<section class="filter-section selected-filters" aria-live="polite">
+  <div class="section-heading">Selected Filters</div>
+  <p class="chip-empty" data-filter-chip-empty>No filters selected.</p>
+  <div class="filter-chips" data-filter-chips></div>
+</section>
+
 <section class="filter-section">
   <div class="section-heading">Languages</div>
   <input
     class="filter-search"
     type="search"
-    placeholder="Filter languages"
-    data-filter-search="#language-options"
+    placeholder="Find languages"
+    data-language-search
   >
-  <div id="language-options" class="filter-options tall">
-    {% for lang in available_langs %}
-      <label class="check-row" data-filter-option="{{ lang|lower }}">
-        <input
-          type="checkbox"
-          name="langs"
-          value="{{ lang }}"
-          {% if lang in state.selected_langs %}checked{% endif %}
-        >
-        <span>{{ lang }}</span>
-      </label>
+  <div data-language-inputs></div>
+  <div
+    id="language-options"
+    class="filter-options tall taxonomy-tree"
+    data-language-tree
+    data-selected-langs='{{ state.selected_langs|tojson }}'
+  >
+    <label class="check-row taxonomy-control" data-language-select-all-row>
+      <input type="checkbox" data-language-select-all>
+      <span data-language-select-all-label>Select all</span>
+    </label>
+
+    {% for family in language_taxonomy.families %}
+      <details
+        class="taxonomy-family"
+        data-family-id="{{ family.id }}"
+        data-family-label="{{ family.label|e }}"
+      >
+        <summary>
+          <label class="check-row taxonomy-summary" data-language-group-row>
+            <input
+              type="checkbox"
+              data-language-group="family"
+              data-group-id="{{ family.id }}"
+            >
+            <span>{{ family.label }}</span>
+          </label>
+        </summary>
+        <div class="taxonomy-branches">
+          {% for branch in family.branches %}
+            <details
+              class="taxonomy-branch"
+              data-branch-id="{{ branch.id }}"
+              data-branch-label="{{ branch.label|e }}"
+            >
+              <summary>
+                <label class="check-row taxonomy-summary" data-language-group-row>
+                  <input
+                    type="checkbox"
+                    data-language-group="branch"
+                    data-group-id="{{ branch.id }}"
+                  >
+                  <span>{{ branch.label }}</span>
+                </label>
+              </summary>
+              <div class="taxonomy-languages">
+                {% for language in branch.languages %}
+                  <label
+                    class="check-row"
+                    data-language-row
+                    data-language-id="{{ language.id }}"
+                    data-language-label="{{ language.label|lower|e }}"
+                  >
+                    <input
+                      type="checkbox"
+                      data-language-checkbox
+                      data-language-id="{{ language.id }}"
+                      value="{{ language.label }}"
+                    >
+                    <span>{{ language.label }}</span>
+                  </label>
+                {% endfor %}
+              </div>
+            </details>
+          {% endfor %}
+        </div>
+      </details>
     {% endfor %}
   </div>
 </section>
@@ -25,7 +87,7 @@
   <div class="section-heading">Parts of Speech</div>
   <div class="filter-options">
     {% for pos in available_pos %}
-      <label class="check-row" data-filter-option="{{ pos }}">
+      <label class="check-row" data-filter-option="{{ pos|lower|e }}">
         <input
           type="checkbox"
           name="pos"
@@ -37,4 +99,3 @@
     {% endfor %}
   </div>
 </section>
-

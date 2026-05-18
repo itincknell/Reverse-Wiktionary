@@ -54,4 +54,3 @@ class SearchService:
             ),
             results=page_results,
         )
-
