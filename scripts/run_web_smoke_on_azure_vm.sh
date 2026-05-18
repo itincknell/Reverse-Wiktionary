@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Package the current repo and run a web/API smoke test on an existing Azure VM.
+# Package the current working tree and run a web/API smoke test on an existing
+# Azure VM. Production deployment uses a Git checkout on the VM; this script is
+# for testing local changes before they are committed or pushed.
 
 RESOURCE_GROUP=""
 VM_NAME=""
@@ -9,7 +11,7 @@ STORAGE_ACCOUNT=""
 CONTAINER=""
 COLLECTION_NAME="reverse_wiktionary_v1"
 MODEL_NAME="sentence-transformers/all-mpnet-base-v2"
-QDRANT_HNSW_EF="512"
+QDRANT_HNSW_EF="64"
 QDRANT_ACORN_MAX_SELECTIVITY="1.0"
 SEARCH_EXACT_FILTERED="false"
 VM_REPO_DIR="/opt/reverse-wiktionary-web-smoke"
@@ -35,7 +37,7 @@ Optional:
   --vm-repo-dir PATH
       Defaults to /opt/reverse-wiktionary-web-smoke.
   --qdrant-hnsw-ef N
-      Query-time HNSW exploration parameter. Defaults to 512.
+      Query-time HNSW exploration parameter. Defaults to 64 for beta sizing.
   --qdrant-acorn-max-selectivity N
       ACORN selectivity threshold for filtered searches. Defaults to 1.0.
   --search-exact-filtered

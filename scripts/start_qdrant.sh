@@ -17,4 +17,4 @@ done
 echo
 echo "Qdrant is healthy."
 echo "HTTP: http://localhost:6333"
-echo "Storage: ./qdrant_storage"
+echo "Storage: ./data/qdrant/storage"

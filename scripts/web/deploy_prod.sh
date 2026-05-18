@@ -2,11 +2,17 @@
 set -euo pipefail
 
 COMPOSE_FILE="${COMPOSE_FILE:-deploy/web/compose.prod.yml}"
-WEB_URL="${WEB_URL:-http://127.0.0.1}"
+ENV_FILE="${ENV_FILE:-deploy/web/.env}"
+WEB_URL="${WEB_URL:-http://127.0.0.1:8080}"
+COMPOSE_ARGS=(-f "$COMPOSE_FILE")
+
+if [ -f "$ENV_FILE" ]; then
+  COMPOSE_ARGS=(--env-file "$ENV_FILE" "${COMPOSE_ARGS[@]}")
+fi
 
 ./scripts/web/prepare_prod_dirs.sh
 
-docker compose -f "$COMPOSE_FILE" up -d --build
+docker compose "${COMPOSE_ARGS[@]}" up -d --build
 
 echo "waiting for web health..."
 for _ in $(seq 1 60); do
@@ -19,7 +25,6 @@ for _ in $(seq 1 60); do
 done
 
 echo "web health check failed: $WEB_URL/health"
-docker compose -f "$COMPOSE_FILE" ps
-docker compose -f "$COMPOSE_FILE" logs --tail 100 web
+docker compose "${COMPOSE_ARGS[@]}" ps
+docker compose "${COMPOSE_ARGS[@]}" logs --tail 100 web
 exit 1
-

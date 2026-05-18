@@ -1,150 +1,48 @@
-# Azure Runbook
+# Azure Serving Runbook
 
-Command record for the offline embedding VM run.
+This file records serving deployment settings and command shapes. Offline
+embedding runs are documented in `github.com/itincknell/Reverse-Wiktionary-Offline`.
 
-## Parameters
-
-```bash
-RESOURCE_GROUP="rg-reverse-wiktionary"
-LOCATION="eastus"
-CONTAINER="reverse-wiktionary"
-STORAGE_ACCOUNT="revwik05111434"
-```
+## Shared Azure Settings
 
 ```bash
-VM_NAME="vm-reverse-wiktionary-embed"
-VM_SIZE="Standard_NC4as_T4_v3"
+SUBSCRIPTION_ID="<azure-subscription-id>"
+RESOURCE_GROUP="<resource-group>"
+STORAGE_ACCOUNT="<storage-account>"
+CONTAINER="<blob-container>"
+COLLECTION_NAME="reverse_wiktionary_v1"
 ADMIN_USER="azureuser"
 ```
 
-```bash
-PRODUCT_COLLECTION="reverse_wiktionary_v1"
-PRODUCT_MODEL="sentence-transformers/all-mpnet-base-v2"
-```
-
-## Providers
+## Current Low-Cost Beta Target
 
 ```bash
-az provider register --namespace Microsoft.Storage
-az provider register --namespace Microsoft.Compute
-az provider register --namespace Microsoft.Quota
+LOCATION="northcentralus"
+VM_NAME="vm-reverse-wiktionary-web-beta-ncus"
+VM_SIZE="Standard_B2as_v2"
+OS_DISK_SIZE_GB=64
+STORAGE_SKU="StandardSSD_LRS"
+DATA_ROOT="/opt/reverse-wiktionary/data"
 ```
 
-```bash
-az provider show --namespace Microsoft.Storage --query "registrationState" --output tsv
-az provider show --namespace Microsoft.Compute --query "registrationState" --output tsv
-az provider show --namespace Microsoft.Quota --query "registrationState" --output tsv
+Quota:
+
+```text
+North Central US
+Standard Basv2 Family vCPUs: 4
+Total Regional vCPUs: 14
 ```
 
-## Storage
+Estimated cost:
 
-```bash
-az group create \
-  --name "$RESOURCE_GROUP" \
-  --location "$LOCATION"
+```text
+Standard_B2as_v2 compute: about $54.90/mo
+64 GiB Standard SSD OS disk: about $5/mo
+attached data disk: none
+estimated total: about $60/mo
 ```
 
-```bash
-az storage account create \
-  --name "$STORAGE_ACCOUNT" \
-  --resource-group "$RESOURCE_GROUP" \
-  --location "$LOCATION" \
-  --sku Standard_LRS \
-  --kind StorageV2
-```
-
-```bash
-az storage container create \
-  --account-name "$STORAGE_ACCOUNT" \
-  --name "$CONTAINER" \
-  --auth-mode login
-```
-
-```bash
-az storage container list \
-  --account-name "$STORAGE_ACCOUNT" \
-  --auth-mode login \
-  --output table
-```
-
-## Blob Layout
-
-```bash
-raw/<run_id>/
-raw/latest.json
-
-processed/<run_id>/
-processed/latest.json
-
-embeddings/<run_id>/
-
-code/<run_id>/
-
-indexes/<run_id>/
-indexes/latest.json
-
-logs/<cloud_run_id>/
-```
-
-## Raw Upload
-
-```bash
-./scripts/download_wiktionary_dump.sh --download-new
-```
-
-```bash
-./scripts/upload_raw_to_blob.sh \
-  --storage-account "$STORAGE_ACCOUNT" \
-  --container "$CONTAINER"
-```
-
-```bash
-az storage blob download \
-  --account-name "$STORAGE_ACCOUNT" \
-  --container-name "$CONTAINER" \
-  --name "raw/latest.json" \
-  --file /tmp/raw-latest.json \
-  --auth-mode login \
-  --overwrite
-```
-
-```bash
-jq . /tmp/raw-latest.json
-```
-
-## Optional Local Processed Upload
-
-```bash
-./scripts/run_parse_wiktionary.sh
-```
-
-```bash
-./scripts/upload_processed_to_blob.sh \
-  --storage-account "$STORAGE_ACCOUNT" \
-  --container "$CONTAINER"
-```
-
-## VM Quota And SKU
-
-```bash
-az vm list-skus \
-  --location "$LOCATION" \
-  --size "$VM_SIZE" \
-  --output table
-```
-
-```bash
-QUOTA_SCOPE="/subscriptions/$(az account show --query id --output tsv)/providers/Microsoft.Compute/locations/$LOCATION"
-```
-
-```bash
-az quota list \
-  --scope "$QUOTA_SCOPE" \
-  --output json \
-  | jq -r '.[] | select(((.name.value // .name // "") | tostring | test("NCAS|T4"; "i"))) | [.name.value, .limit.value] | @tsv'
-```
-
-## VM Create
+## VM Creation
 
 ```bash
 az vm create \
@@ -156,176 +54,183 @@ az vm create \
   --admin-username "$ADMIN_USER" \
   --generate-ssh-keys \
   --assign-identity \
-  --os-disk-size-gb 512 \
-  --storage-sku StandardSSD_LRS
+  --os-disk-size-gb "$OS_DISK_SIZE_GB" \
+  --storage-sku "$STORAGE_SKU" \
+  --public-ip-sku Standard
 ```
 
+## Network Exposure
+
+Public web traffic enters through Cloudflare Tunnel. The VM should not expose
+Qdrant, Redis, FastAPI, or Nginx directly to the internet.
+
 ```bash
-az vm extension set \
+MY_IP="$(curl -fsS https://ifconfig.me)"
+
+NSG_NAME="$(
+  az network nsg list \
+    --resource-group "$RESOURCE_GROUP" \
+    --query "[?contains(name, '$VM_NAME')].name | [0]" \
+    --output tsv
+)"
+
+az network nsg rule update \
   --resource-group "$RESOURCE_GROUP" \
-  --vm-name "$VM_NAME" \
-  --name NvidiaGpuDriverLinux \
-  --publisher Microsoft.HpcCompute \
-  --version 1.6
-```
+  --nsg-name "$NSG_NAME" \
+  --name default-allow-ssh \
+  --source-address-prefixes "$MY_IP/32"
 
-## VM Blob Role
-
-```bash
-PRINCIPAL_ID="$(az vm identity show \
+az network nsg rule list \
   --resource-group "$RESOURCE_GROUP" \
-  --name "$VM_NAME" \
-  --query principalId \
-  --output tsv)"
+  --nsg-name "$NSG_NAME" \
+  --query "[].{name:name, access:access, direction:direction, port:destinationPortRange, source:sourceAddressPrefix}" \
+  --output table
 ```
 
-```bash
-STORAGE_ID="$(az storage account show \
-  --name "$STORAGE_ACCOUNT" \
-  --resource-group "$RESOURCE_GROUP" \
-  --query id \
-  --output tsv)"
+Expected public inbound rule:
+
+```text
+SSH from the operator IP only.
+No inbound 80/443 rule.
 ```
 
+## Storage Access
+
 ```bash
+PRINCIPAL_ID="$(
+  az vm show \
+    --resource-group "$RESOURCE_GROUP" \
+    --name "$VM_NAME" \
+    --query identity.principalId \
+    --output tsv
+)"
+
+STORAGE_ID="$(
+  az storage account show \
+    --resource-group "$RESOURCE_GROUP" \
+    --name "$STORAGE_ACCOUNT" \
+    --query id \
+    --output tsv
+)"
+
 az role assignment create \
   --assignee "$PRINCIPAL_ID" \
   --role "Storage Blob Data Contributor" \
   --scope "$STORAGE_ID"
 ```
 
-## VM Bootstrap
+## Bootstrap
 
 ```bash
 az vm run-command invoke \
   --resource-group "$RESOURCE_GROUP" \
   --name "$VM_NAME" \
   --command-id RunShellScript \
-  --scripts @scripts/azure/bootstrap_embedding_vm.sh
+  --scripts @scripts/azure/bootstrap_serving_vm.sh
 ```
+
+## Clone/Update Serving Repo
+
+The serving repo is public, so the VM can use HTTPS without GitHub credentials.
 
 ```bash
 az vm run-command invoke \
   --resource-group "$RESOURCE_GROUP" \
   --name "$VM_NAME" \
   --command-id RunShellScript \
-  --scripts "python --version && python -m pip --version && az version && docker --version && docker compose version"
+  --scripts @scripts/azure/clone_or_update_serving_repo.sh
 ```
 
-```bash
-az vm run-command invoke \
-  --resource-group "$RESOURCE_GROUP" \
-  --name "$VM_NAME" \
-  --command-id RunShellScript \
-  --scripts "az login --identity --output none && az storage container list --account-name $STORAGE_ACCOUNT --auth-mode login --output table"
+Default VM checkout:
+
+```text
+/opt/reverse-wiktionary/app
 ```
 
-## Product Run
+Patch/update flow on the VM:
 
 ```bash
-./scripts/run_embeddings_on_azure_vm.sh \
-  --resource-group "$RESOURCE_GROUP" \
-  --vm-name "$VM_NAME" \
-  --storage-account "$STORAGE_ACCOUNT" \
-  --container "$CONTAINER" \
-  --collection-name "$PRODUCT_COLLECTION" \
-  --model-name "$PRODUCT_MODEL" \
-  --prepare-processed-if-missing
+cd /opt/reverse-wiktionary/app
+git pull --ff-only origin main
+./scripts/web/restart.sh
 ```
 
-```bash
-CLOUD_RUN_ID="<cloud_run_id_from_launcher_output>"
+## Cloudflare Tunnel
+
+Create a Cloudflare Tunnel in Cloudflare Zero Trust and route the public
+hostname to the Docker service URL:
+
+```text
+service: http://nginx:80
 ```
 
-## Live Status
+Store the tunnel token only on the VM:
 
 ```bash
-az storage blob download \
-  --account-name "$STORAGE_ACCOUNT" \
-  --container-name "$CONTAINER" \
-  --name "logs/$CLOUD_RUN_ID/status.json" \
-  --file "/tmp/reverse-wiktionary-$CLOUD_RUN_ID-status.json" \
-  --auth-mode login \
-  --overwrite
+cd /opt/reverse-wiktionary/app
+cp deploy/web/.env.example deploy/web/.env
+chmod 600 deploy/web/.env
 ```
 
-```bash
-jq . "/tmp/reverse-wiktionary-$CLOUD_RUN_ID-status.json"
+Edit `deploy/web/.env` on the VM:
+
+```text
+COMPOSE_PROFILES=cloudflare
+CLOUDFLARE_TUNNEL_TOKEN=<cloudflare-tunnel-token>
 ```
 
+Start the public deployment:
+
 ```bash
-az storage blob download \
-  --account-name "$STORAGE_ACCOUNT" \
-  --container-name "$CONTAINER" \
-  --name "logs/$CLOUD_RUN_ID/remote_embedding_job.log" \
-  --file "/tmp/reverse-wiktionary-$CLOUD_RUN_ID.log" \
-  --auth-mode login \
-  --overwrite
+cd /opt/reverse-wiktionary/app
+./scripts/web/deploy_cloudflare.sh
 ```
 
-```bash
-tail -n 80 "/tmp/reverse-wiktionary-$CLOUD_RUN_ID.log"
+`scripts/web/deploy_prod.sh` reads `deploy/web/.env` explicitly when the file is
+present. `scripts/web/deploy_cloudflare.sh` refuses to start without a tunnel
+token.
+
+Production Docker networking:
+
+```text
+Qdrant: Docker-internal only
+Redis: Docker-internal only
+FastAPI: Docker-internal only
+Nginx: bound to 127.0.0.1:8080 on the VM
+Cloudflare Tunnel: outbound-only public path
 ```
 
-## SSH Monitor
+## Web Smoke
 
 ```bash
-ssh azureuser@<vm_public_ip>
-```
-
-```bash
-sudo journalctl -u "reverse-wiktionary-$CLOUD_RUN_ID" -f
-```
-
-```bash
-tail -f "/tmp/reverse-wiktionary-$CLOUD_RUN_ID.log"
-```
-
-```bash
-nvidia-smi
-```
-
-```bash
-curl -fsS "http://localhost:6333/collections/$PRODUCT_COLLECTION" \
-  | jq '{status: .result.status, points: .result.points_count, indexed: .result.indexed_vectors_count, queue: .result.update_queue.length}'
-```
-
-## Snapshot-Only Rerun
-
-```bash
-EMBEDDING_RUN_ID="<embedding_run_id>"
-```
-
-```bash
-./scripts/snapshot_qdrant_on_azure_vm.sh \
+./scripts/run_web_smoke_on_azure_vm.sh \
   --resource-group "$RESOURCE_GROUP" \
   --vm-name "$VM_NAME" \
   --storage-account "$STORAGE_ACCOUNT" \
   --container "$CONTAINER" \
-  --collection-name "$PRODUCT_COLLECTION" \
-  --run-id "$EMBEDDING_RUN_ID" \
-  --timeout-seconds 3600 \
-  --poll-interval-seconds 5
+  --collection-name "$COLLECTION_NAME" \
+  --qdrant-hnsw-ef 64
 ```
 
+## SSH Tunnel Preview
+
 ```bash
-./scripts/snapshot_qdrant_on_azure_vm.sh \
-  --resource-group "$RESOURCE_GROUP" \
-  --vm-name "$VM_NAME" \
-  --storage-account "$STORAGE_ACCOUNT" \
-  --container "$CONTAINER" \
-  --collection-name "$PRODUCT_COLLECTION" \
-  --run-id "$EMBEDDING_RUN_ID" \
-  --reuse-existing
+PUBLIC_IP="$(
+  az vm show \
+    --resource-group "$RESOURCE_GROUP" \
+    --name "$VM_NAME" \
+    --show-details \
+    --query publicIps \
+    --output tsv
+)"
+
+ssh -N -L 18000:127.0.0.1:8080 "$ADMIN_USER@$PUBLIC_IP"
 ```
 
-## Run Record
+Preview:
 
-```bash
-./scripts/create_offline_run_record.sh \
-  --storage-account "$STORAGE_ACCOUNT" \
-  --container "$CONTAINER" \
-  --cloud-run-id "$CLOUD_RUN_ID"
+```text
+http://127.0.0.1:18000
 ```
 
 ## Shutdown
@@ -336,23 +241,5 @@ az vm deallocate \
   --name "$VM_NAME"
 ```
 
-```bash
-az vm get-instance-view \
-  --resource-group "$RESOURCE_GROUP" \
-  --name "$VM_NAME" \
-  --query "instanceView.statuses[?starts_with(code, 'PowerState/')].displayStatus" \
-  --output tsv
-```
-
-## 20260512 Run Notes
-
-```bash
-# 20260512T203456Z: dependency install failed from local pip-freeze requirements.
-# resolution: requirements.txt contains direct runtime dependencies only.
-```
-
-```bash
-# 20260512T204458Z: embeddings completed; original wrapper failed during Qdrant snapshot.
-# recovery: snapshot uploaded manually under indexes/20260512T204458Z.
-# follow-up: background systemd jobs, live Blob status/log upload, 3600s snapshot timeout.
-```
+`deallocate` stops compute billing. The OS disk and public IP continue to incur
+small storage/network charges until deleted.

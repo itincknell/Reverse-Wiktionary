@@ -1,9 +1,4 @@
-"""
-Shared lexical schema constants.
-
-Offline preprocessing and web serving use the same part-of-speech vocabulary so
-the indexed data contract and filter UI cannot drift independently.
-"""
+"""Part-of-speech vocabulary accepted by the public search API."""
 
 ALLOWED_POS = (
     "noun",
@@ -16,4 +11,3 @@ ALLOWED_POS = (
     "proverb",
     "idiom",
 )
-

@@ -1,7 +1,7 @@
 # Web Serving Design
 
-The web service serves natural-language reverse dictionary queries against the
-production Qdrant collection built by the offline indexing pipeline.
+The web service serves natural-language reverse dictionary queries against a
+Qdrant snapshot produced by `github.com/itincknell/Reverse-Wiktionary-Offline`.
 
 ## Architecture
 
@@ -11,25 +11,28 @@ Azure Blob Qdrant snapshot
   -> Qdrant container
   -> FastAPI search/web service
   -> Nginx reverse proxy
+  -> Cloudflare Tunnel
   -> public UI and stable API
 ```
 
-The serving stack does not own preprocessing, embedding generation, or index
-construction. It restores or connects to an existing collection and serves
-ranked lexical results.
+This repository does not own preprocessing, embedding generation, taxonomy
+construction, or snapshot creation. It restores or connects to existing serving
+artifacts and handles query traffic.
 
 ## Locked Decisions
 
 ```text
 reverse proxy: Nginx
-server model: multiple sync FastAPI workers
-model placement: one SentenceTransformer model copy per worker
+web framework: FastAPI
+query workers: Uvicorn workers, each with its own model instance
 session state: Redis with TTL
 result navigation: Load more button
-language list: fetched from Qdrant once at startup
-payload indexes: created offline before serving deployment
-production storage: stable host paths under /mnt/reverse-wiktionary
+language list: Qdrant facet at startup plus taxonomy artifact when present
+payload indexes: included in the serving snapshot
+filtered search: Qdrant ACORN, max_selectivity=1.0
+production storage: /opt/reverse-wiktionary/data
 API stability: public stable v1 API
+public edge: Cloudflare Tunnel in front of Nginx
 ```
 
 The query layer is replicated inside each FastAPI worker. There is no central
@@ -41,15 +44,23 @@ and search service objects.
 ```text
 src/search/        Qdrant query client and search orchestration.
 src/web/           FastAPI app, templates, static assets, session state.
-src/taxonomy/      Offline serving taxonomy builders and Glottolog matching.
-deploy/web/        Web Dockerfile, compose files, Nginx config.
-scripts/web/       Restore, deploy, health check, and smoke-test scripts.
-scripts/qdrant/    Payload-index creation and verification scripts.
-scripts/taxonomy/  Taxonomy artifact builders for processed runs.
+deploy/web/        Web Dockerfile, Compose files, Nginx config.
+scripts/web/       Deploy, health check, smoke, and benchmark scripts.
+scripts/azure/     VM bootstrap and remote web smoke entrypoints.
+scripts/qdrant/    Serving-side Qdrant verification/tuning helpers.
 ```
 
-`src/search/` owns Qdrant read/query behavior. `src/embeddings/` owns
-preprocessing, embedding generation, and index construction.
+## Public Edge
+
+The production Compose stack is private by default. Qdrant, Redis, and FastAPI
+are reachable only on Docker-internal networking. Nginx binds to
+`127.0.0.1:8080` for local health checks and SSH previews. Public traffic uses
+Cloudflare Tunnel, which makes an outbound connection from the VM and does not
+require inbound VM rules for ports 80 or 443.
+
+Nginx applies a small request body limit, proxy timeouts, security headers, and
+modest request limiting keyed by `CF-Connecting-IP` when Cloudflare supplies it.
+The Azure NSG should allow SSH only from the operator IP during maintenance.
 
 ## Stable API
 
@@ -116,14 +127,14 @@ multiple languages: OR
 multiple POS values: OR
 language filter AND POS filter
 repeated values are normalized and deduplicated
-no grouping
-no reranking
+no application-side reranking
 ```
 
 ## Web Routes
 
 ```text
 GET  /
+GET  /about
 POST /ui/search
 POST /ui/search/more
 GET  /health
@@ -144,7 +155,7 @@ request
   -> return JSON or render HTML partial
 ```
 
-Search logs include route-level timings without recording raw query text:
+Search logs include aggregate timings without recording raw query text:
 
 ```text
 embedding_ms
@@ -156,19 +167,16 @@ result_count
 filter counts
 ```
 
-Qdrant searches use query-time `hnsw_ef=512` by default. Searches with language
-or POS filters additionally enable Qdrant ACORN traversal with
-`max_selectivity=1.0`; this preserved filtered retrieval quality in live tests
-without moving filtering or reranking into application code.
+Qdrant searches use configurable query-time `hnsw_ef`. Searches with language
+or POS filters enable Qdrant ACORN traversal with `max_selectivity=1.0`; this
+preserved filtered retrieval quality in live tests without moving filtering or
+reranking into application code.
 
 For diagnostics, `SEARCH_EXACT_FILTERED=true` switches filtered requests to
 exact Qdrant search.
 
-The web service uses the same embedding model family as the offline pipeline:
-
-```text
-sentence-transformers/all-mpnet-base-v2
-```
+The web service must use the same embedding model and vector dimension as the
+serving snapshot.
 
 ## UI
 
@@ -178,7 +186,7 @@ UI stack:
 FastAPI
 Jinja2
 HTMX
-plain CSS
+plain CSS and JavaScript
 ```
 
 UI behavior:
@@ -193,29 +201,10 @@ gloss display: first three glosses, show-more toggle for the rest
 expansion display: hidden by default, toggle when present
 ```
 
-Result cards show:
-
-```text
-word
-language
-part of speech
-glosses
-expansion
-```
-
-Scores are included in the API response and hidden in the normal UI.
-
-The language selector is a custom searchable multi-select populated from the
-offline taxonomy artifact when available. The POS selector uses the shared
-vocabulary from `src/common/lexical_schema.py`, narrowed at runtime to values
-present in `serving_metadata.json`.
-
-Language-tree metadata is built offline from processed `serving_metadata.json`
-plus Glottolog release data. The web UI consumes that artifact when available
-and falls back to the flat Qdrant language facet. The browse tree is deliberately
-smaller than the full language universe: low-value singleton family paths are
-pruned from the tree, while the flat taxonomy language list still powers
-search-only matches, select-all, and submitted filter allowlists.
+The language selector consumes the offline-produced taxonomy artifact when
+available and falls back to the flat Qdrant language facet. The visible browse
+tree may omit low-value singleton family paths; the flat `all_languages` list
+still powers search-only matches, select-all, and submitted filter allowlists.
 
 ## Session State
 
@@ -252,7 +241,7 @@ Qdrant container
 Redis container
 FastAPI/web container
 Nginx reverse proxy
-managed disk for Qdrant storage
+OS disk for durable Qdrant storage
 ```
 
 Initial FastAPI worker count:
@@ -268,13 +257,14 @@ Production host paths:
 
 ```text
 /opt/reverse-wiktionary/app
-/mnt/reverse-wiktionary/qdrant/storage
-/mnt/reverse-wiktionary/redis/data
-/mnt/reverse-wiktionary/logs
-/mnt/reverse-wiktionary/snapshots
+/opt/reverse-wiktionary/data/qdrant/storage
+/opt/reverse-wiktionary/data/redis/data
+/opt/reverse-wiktionary/data/logs
+/opt/reverse-wiktionary/data/snapshots
 ```
 
-Production Qdrant storage must not live under the application repository.
+Production Qdrant storage must not live under the application repository or the
+Azure temporary disk.
 
 ## Restore Flow
 
@@ -284,6 +274,7 @@ download indexes/<run_id>/manifest.json
 download snapshot from indexes/<run_id>/snapshots/
 restore Qdrant collection
 verify lang and pos payload indexes
+delete downloaded snapshot when restore is complete
 start web service
 verify /health
 ```
@@ -291,9 +282,10 @@ verify /health
 ## Benchmarking
 
 Serving latency testing uses `scripts/web/benchmark_search.py` with a fixed
-query set in `scripts/web/benchmark_queries.json`. The harness exercises API and UI
-routes separately and reports latency percentiles, throughput, errors, and API
-search timing fields. It can also write per-request samples for later review.
+query set in `scripts/web/benchmark_queries.json`. The harness exercises API and
+UI routes separately and reports latency percentiles, throughput, errors, and
+API search timing fields. It can also write per-request samples for later
+review.
 
 Remote smoke runs upload benchmark artifacts and the web log to:
 
@@ -303,46 +295,36 @@ logs/web_smoke/<run_id>/benchmark_samples.json
 logs/web_smoke/<run_id>/web.log
 ```
 
-Cloud tuning should vary FastAPI worker count and request concurrency before
-selecting the serving VM size.
+## Sizing Notes
 
-Serving snapshots should be prepared offline with payload indexes on:
-
-```text
-lang: keyword
-pos: keyword
-```
-
-May 2026 smoke benchmarks on the production collection before quantization
-showed:
+May 2026 live tests on the 768-dimensional production collection showed:
 
 ```text
 Qdrant version: 1.18.0
 points: 3,869,247
-unfiltered API, concurrency 4: 38.19 rps, p95 120.65 ms
-English-filtered API, concurrency 4: 23.18 rps, p95 233.97 ms
-French-filtered API, concurrency 4: 27.64 rps, p95 203.02 ms
+filtered quality fix: ACORN enabled
+quantization: scalar int8, original vectors on disk
 ```
 
-Serving memory was dominated by Qdrant: about 13.6 GiB RSS for the collection,
-plus about 1.5 GiB for one web worker/model process. The T4 GPU was not used
-for serving.
+On an 8 GiB `Standard_B2ms` host, Qdrant fit in memory but fresh searches were
+sometimes slow. `vmstat` during a 7s query showed high iowait, which points to
+disk/page-cache pressure rather than Python/model CPU.
 
-Scalar int8 quantization with original vectors on disk preserved manual result
-quality and reduced Qdrant Docker memory to about 3.3 GiB during the follow-up
-benchmark. This changed the beta target from a 32 GiB host to a lean CPU VM:
+Current low-cost beta target:
 
 ```text
-target VM: Standard_D2as_v5
-CPU/RAM: 2 vCPU / 8 GiB
-disk: 256 GiB Standard SSD
-estimated 24/7 cost: about $82/month including disk
+region: northcentralus
+vm: Standard_B2as_v2
+cpu/ram: 2 burstable vCPU / 8 GiB
+disk: 64 GiB Standard SSD OS disk
+estimated cost: about $60/mo
 ```
 
-The fallback for more memory headroom is `Standard_E2as_v5` with 2 vCPU /
-16 GiB RAM.
+The next offline artifact set should use 512-dimensional vectors with scalar
+int8 quantization before snapshotting. That should reduce vector-sized storage
+and cache pressure by about one third while keeping the product scope intact.
 
-Committed run summary:
+Committed run summaries:
 
 ```text
 runs/web_serving/20260518-acorn-sizing.md
@@ -364,7 +346,7 @@ runs/web_serving/20260518-quantized-sizing.md
   "available_langs": 0,
   "available_pos": 9,
   "language_taxonomy_families": 0,
-  "qdrant_hnsw_ef": 512,
+  "qdrant_hnsw_ef": 64,
   "qdrant_acorn_max_selectivity": 1.0,
   "search_exact_filtered": false
 }
@@ -373,33 +355,10 @@ runs/web_serving/20260518-quantized-sizing.md
 The endpoint returns non-200 when Qdrant, Redis, model loading, or the
 collection check fails.
 
-## Metrics
-
-Per-search logs:
-
-```text
-route
-query_length
-langs_count
-pos_count
-limit
-offset
-embedding_ms
-qdrant_ms
-search_total_ms
-route_overhead_ms
-route_total_ms
-result_count
-has_more
-```
-
-Do not log full query text by default.
-
 ## Remaining Deployment Work
 
-- Restore the serving snapshot on the final CPU VM.
-- Run the web smoke benchmark on the final VM size.
-- Configure Nginx for the production domain and TLS.
-- Add rate limiting before public traffic.
-- Keep result caching, query expansion, reranking, and infinite scroll out of
-  the first deployment unless benchmark or user feedback justifies them.
+- Generate the condensed 512-dimensional serving snapshot in the offline repo.
+- Restore the serving snapshot on the North Central US beta VM.
+- Run web smoke and sizing benchmarks against the restored collection.
+- Configure the Cloudflare Tunnel hostname for the production domain.
+- Tune public-edge rate limiting after beta traffic tests.

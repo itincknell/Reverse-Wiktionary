@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Azure Run Command payload for web/API smoke testing.
+# Azure Run Command payload for tarball-based web/API smoke testing.
+#
+# Production deployment uses a Git checkout on the VM. This helper intentionally
+# accepts an uploaded working-tree archive so local changes can be smoke tested
+# before they are committed or pushed.
 
 storageAccount="${storageAccount:-}"
 container="${container:-}"
@@ -9,7 +13,7 @@ codeArchiveBlob="${codeArchiveBlob:-}"
 repoDir="${repoDir:-/opt/reverse-wiktionary-web-smoke}"
 collectionName="${collectionName:-reverse_wiktionary_v1}"
 modelName="${modelName:-sentence-transformers/all-mpnet-base-v2}"
-qdrantHnswEf="${qdrantHnswEf:-512}"
+qdrantHnswEf="${qdrantHnswEf:-64}"
 qdrantAcornMaxSelectivity="${qdrantAcornMaxSelectivity:-1.0}"
 searchExactFiltered="${searchExactFiltered:-false}"
 runId="${runId:-$(date -u +%Y%m%dT%H%M%SZ)}"
@@ -104,7 +108,7 @@ echo "=== Start Redis ==="
 docker rm -f reverse-wiktionary-redis-smoke >/dev/null 2>&1 || true
 docker run -d \
   --name reverse-wiktionary-redis-smoke \
-  -p 6379:6379 \
+  -p 127.0.0.1:6379:6379 \
   redis:7 \
   redis-server --appendonly yes >/dev/null
 
@@ -120,8 +124,8 @@ if ! curl -fsS http://localhost:6333/healthz >/dev/null 2>&1; then
   docker rm -f reverse-wiktionary-qdrant-smoke >/dev/null 2>&1 || true
   docker run -d \
     --name reverse-wiktionary-qdrant-smoke \
-    -p 6333:6333 \
-    -p 6334:6334 \
+    -p 127.0.0.1:6333:6333 \
+    -p 127.0.0.1:6334:6334 \
     -v "$qdrantStorage:/qdrant/storage" \
     qdrant/qdrant:latest >/dev/null
 fi

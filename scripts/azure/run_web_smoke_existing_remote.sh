@@ -8,7 +8,7 @@ storageAccount="${storageAccount:-}"
 container="${container:-}"
 collectionName="${collectionName:-reverse_wiktionary_v1}"
 modelName="${modelName:-sentence-transformers/all-mpnet-base-v2}"
-qdrantHnswEf="${qdrantHnswEf:-512}"
+qdrantHnswEf="${qdrantHnswEf:-64}"
 qdrantAcornMaxSelectivity="${qdrantAcornMaxSelectivity:-1.0}"
 searchExactFiltered="${searchExactFiltered:-false}"
 runId="${runId:-$(date -u +%Y%m%dT%H%M%SZ)}"
@@ -80,7 +80,7 @@ if ! docker ps --format '{{.Names}}' | grep -qx reverse-wiktionary-redis-smoke; 
   docker rm -f reverse-wiktionary-redis-smoke >/dev/null 2>&1 || true
   docker run -d \
     --name reverse-wiktionary-redis-smoke \
-    -p 6379:6379 \
+    -p 127.0.0.1:6379:6379 \
     redis:7 \
     redis-server --appendonly yes >/dev/null
 fi

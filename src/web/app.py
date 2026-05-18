@@ -320,7 +320,7 @@ def _elapsed_ms(started: float) -> float:
 
 def available_pos_from_metadata(path: str) -> list[str]:
     """
-    Return POS filters present in the current processed run.
+    Return POS filters present in the staged serving metadata.
 
     The shared lexical schema remains the allowlist. Runtime metadata narrows
     the visible UI filters to values that actually exist in the restored data.

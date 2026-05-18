@@ -27,6 +27,9 @@ services:
       MODEL_NAME: ${MODEL_NAME:-sentence-transformers/all-mpnet-base-v2}
       MODEL_DEVICE: ${MODEL_DEVICE:-auto}
       QDRANT_URL: http://qdrant:6333
+      QDRANT_HNSW_EF: ${QDRANT_HNSW_EF:-64}
+      QDRANT_ACORN_MAX_SELECTIVITY: ${QDRANT_ACORN_MAX_SELECTIVITY:-1.0}
+      SEARCH_EXACT_FILTERED: ${SEARCH_EXACT_FILTERED:-false}
       REDIS_URL: redis://redis:6379/0
       DEFAULT_LIMIT: ${DEFAULT_LIMIT:-25}
       MAX_LIMIT: ${MAX_LIMIT:-100}
@@ -38,4 +41,3 @@ services:
       - qdrant
       - redis
     restart: unless-stopped
-

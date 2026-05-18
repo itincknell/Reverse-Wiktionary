@@ -1,9 +1,4 @@
-"""
-Run identifier utilities.
-
-Pipeline artifacts are stored in timestamped directories so each raw,
-processed, and embedding run is reproducible and independently inspectable.
-"""
+"""UTC timestamp helpers for serving logs and benchmark artifact IDs."""
 
 from __future__ import annotations
 
@@ -15,7 +10,7 @@ RUN_ID_FORMAT = "%Y%m%dT%H%M%SZ"
 
 def utc_run_id() -> str:
     """
-    Return a filesystem-safe UTC timestamp suitable for artifact directories.
+    Return a filesystem-safe UTC timestamp suitable for run directories.
 
     Example:
         20260506T184500Z
@@ -32,7 +27,7 @@ def utc_now_iso() -> str:
 
 def is_run_id(value: str) -> bool:
     """
-    Return True if value looks like a pipeline run identifier.
+    Return True if value looks like a timestamped run identifier.
 
     This validates the timestamp shape but does not verify that the date is
     semantically valid.

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# One-time package bootstrap for the offline embedding VM.
+# One-time package bootstrap for a serving VM.
 #
-# This script is intended to run through Azure VM Run Command before invoking
-# the embedding job. It installs system tools only; Python project dependencies
-# are installed by the remote job after it extracts the repo archive.
+# This script is intended to run through Azure VM Run Command before staging the
+# web service. It installs system tools only; Python project dependencies are
+# installed after the serving repo is cloned or updated.
 
 export DEBIAN_FRONTEND=noninteractive
 

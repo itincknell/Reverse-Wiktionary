@@ -22,7 +22,7 @@ class QdrantSearchConfig:
 
     url: str
     collection_name: str
-    hnsw_ef: int | None = 512
+    hnsw_ef: int | None = 64
     acorn_max_selectivity: float = 1.0
     exact_filtered: bool = False
     language_facet_limit: int = 10_000
@@ -35,7 +35,7 @@ class QdrantSearchClient:
 
     The serving code uses the official client rather than handwritten HTTP
     requests so filter construction and response handling stay aligned with the
-    Qdrant Python API already used by the indexing pipeline.
+    Qdrant Python API.
     """
 
     def __init__(self, config: QdrantSearchConfig) -> None:
@@ -58,9 +58,8 @@ class QdrantSearchClient:
         """
         Fetch language values from Qdrant once during app startup.
 
-        This is serving-time metadata, not a per-request operation. The offline
-        processed run also records language counts, but Qdrant remains the
-        source of truth for the restored serving collection.
+        This is serving-time metadata, not a per-request operation. Qdrant is
+        the source of truth for the restored serving collection.
         """
         response = self.client.facet(
             collection_name=self.config.collection_name,

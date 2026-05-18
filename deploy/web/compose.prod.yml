@@ -2,7 +2,7 @@ services:
   qdrant:
     image: qdrant/qdrant:latest
     volumes:
-      - /mnt/reverse-wiktionary/qdrant/storage:/qdrant/storage
+      - ${REVERSE_WIKTIONARY_DATA_ROOT:-/opt/reverse-wiktionary/data}/qdrant/storage:/qdrant/storage
     expose:
       - "6333"
       - "6334"
@@ -12,7 +12,7 @@ services:
     image: redis:7
     command: redis-server --appendonly yes
     volumes:
-      - /mnt/reverse-wiktionary/redis/data:/data
+      - ${REVERSE_WIKTIONARY_DATA_ROOT:-/opt/reverse-wiktionary/data}/redis/data:/data
     expose:
       - "6379"
     restart: unless-stopped
@@ -27,6 +27,9 @@ services:
       MODEL_NAME: ${MODEL_NAME:-sentence-transformers/all-mpnet-base-v2}
       MODEL_DEVICE: ${MODEL_DEVICE:-auto}
       QDRANT_URL: http://qdrant:6333
+      QDRANT_HNSW_EF: ${QDRANT_HNSW_EF:-64}
+      QDRANT_ACORN_MAX_SELECTIVITY: ${QDRANT_ACORN_MAX_SELECTIVITY:-1.0}
+      SEARCH_EXACT_FILTERED: ${SEARCH_EXACT_FILTERED:-false}
       REDIS_URL: redis://redis:6379/0
       DEFAULT_LIMIT: ${DEFAULT_LIMIT:-25}
       MAX_LIMIT: ${MAX_LIMIT:-100}
@@ -42,12 +45,19 @@ services:
   nginx:
     image: nginx:1.27
     ports:
-      - "80:80"
-      - "443:443"
+      - "127.0.0.1:8080:80"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
-      - /mnt/reverse-wiktionary/logs/nginx:/var/log/nginx
+      - ${REVERSE_WIKTIONARY_DATA_ROOT:-/opt/reverse-wiktionary/data}/logs/nginx:/var/log/nginx
     depends_on:
       - web
     restart: unless-stopped
 
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - nginx
+    restart: unless-stopped
+    profiles:
+      - cloudflare
