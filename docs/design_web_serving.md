@@ -261,6 +261,7 @@ Production host paths:
 /opt/reverse-wiktionary/data/redis/data
 /opt/reverse-wiktionary/data/logs
 /opt/reverse-wiktionary/data/snapshots
+/opt/reverse-wiktionary/data/restore
 ```
 
 Production Qdrant storage must not live under the application repository or the
@@ -274,6 +275,7 @@ download indexes/<run_id>/manifest.json
 download snapshot from indexes/<run_id>/snapshots/
 restore Qdrant collection
 verify lang and pos payload indexes
+stage processed/latest language taxonomy and serving metadata
 delete downloaded snapshot when restore is complete
 start web service
 verify /health

@@ -3,6 +3,7 @@ services:
     image: qdrant/qdrant:latest
     volumes:
       - ${REVERSE_WIKTIONARY_DATA_ROOT:-/opt/reverse-wiktionary/data}/qdrant/storage:/qdrant/storage
+      - ${REVERSE_WIKTIONARY_DATA_ROOT:-/opt/reverse-wiktionary/data}/snapshots:/qdrant/snapshots
     expose:
       - "6333"
       - "6334"

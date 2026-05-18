@@ -200,6 +200,20 @@ Nginx: bound to 127.0.0.1:8080 on the VM
 Cloudflare Tunnel: outbound-only public path
 ```
 
+## Restore Serving Artifacts
+
+```bash
+cd /opt/reverse-wiktionary/app
+
+./scripts/web/restore_qdrant_from_blob.sh \
+  --storage-account "$STORAGE_ACCOUNT" \
+  --container "$CONTAINER" \
+  --collection-name "$COLLECTION_NAME"
+```
+
+Use `--replace-existing` when intentionally replacing an existing restored
+collection.
+
 ## Web Smoke
 
 ```bash
