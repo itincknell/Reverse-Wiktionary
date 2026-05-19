@@ -155,6 +155,7 @@ textarea:focus,
 .filter-panel-summary {
   display: block;
   list-style: none;
+  cursor: default;
 }
 
 .filter-panel-summary::marker {
@@ -253,7 +254,7 @@ textarea:focus,
 }
 
 .filter-options.tall {
-  max-height: 360px;
+  max-height: 220px;
   overflow: auto;
   padding-right: 4px;
 }

@@ -21,6 +21,33 @@
       });
     }
 
+    panels.forEach((panel) => {
+      const summary = panel.querySelector("summary");
+      if (!summary) {
+        return;
+      }
+
+      summary.addEventListener("click", (event) => {
+        if (!media.matches) {
+          event.preventDefault();
+          panel.setAttribute("open", "");
+        }
+      });
+
+      summary.addEventListener("keydown", (event) => {
+        if (!media.matches && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          panel.setAttribute("open", "");
+        }
+      });
+
+      panel.addEventListener("toggle", () => {
+        if (!media.matches && !panel.open) {
+          panel.setAttribute("open", "");
+        }
+      });
+    });
+
     syncPanels();
     media.addEventListener("change", syncPanels);
   }

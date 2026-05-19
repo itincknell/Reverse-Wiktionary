@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="bg3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff006e"/>
+      <stop offset="42%" stop-color="#ff4d00"/>
+      <stop offset="100%" stop-color="#7b2cff"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="44" fill="url(#bg3)"/>
+  <rect x="12" y="12" width="232" height="232" rx="34" fill="#ffffff" opacity="0.16"/>
+  <text
+    x="48%"
+    y="56%"
+    text-anchor="middle"
+    dominant-baseline="middle"
+    font-size="182"
+    font-family="UnifrakturCook, UnifrakturMaguntia, Old English Text MT, serif"
+    font-weight="700"
+    fill="#fff7fb"
+    letter-spacing="-10">𝕴𝕿</text>
+</svg>
