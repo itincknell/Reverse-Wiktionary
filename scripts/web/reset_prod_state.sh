@@ -40,6 +40,28 @@ require_value() {
   fi
 }
 
+remove_path() {
+  path="$1"
+  if rm -rf "$path" 2>/dev/null; then
+    return
+  fi
+
+  if command -v sudo >/dev/null 2>&1; then
+    sudo rm -rf "$path"
+    return
+  fi
+
+  rm -rf "$path"
+}
+
+ensure_dir() {
+  path="$1"
+  mkdir -p "$path"
+  if command -v sudo >/dev/null 2>&1; then
+    sudo chown -R "$(id -u):$(id -g)" "$path" 2>/dev/null || true
+  fi
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --data-root)
@@ -92,21 +114,25 @@ if command -v docker >/dev/null 2>&1; then
   docker compose "${composeArgs[@]}" down --remove-orphans || true
 fi
 
-rm -rf \
+for path in \
   "$DATA_ROOT/qdrant/storage" \
   "$DATA_ROOT/redis/data" \
   "$DATA_ROOT/snapshots" \
   "$DATA_ROOT/restore" \
   "$DATA_ROOT/processed/latest" \
-  "$DATA_ROOT/logs"
+  "$DATA_ROOT/logs"; do
+  remove_path "$path"
+done
 
-mkdir -p \
+for path in \
   "$DATA_ROOT/qdrant/storage" \
   "$DATA_ROOT/redis/data" \
   "$DATA_ROOT/snapshots" \
   "$DATA_ROOT/restore" \
   "$DATA_ROOT/processed/latest" \
-  "$DATA_ROOT/logs/nginx"
+  "$DATA_ROOT/logs/nginx"; do
+  ensure_dir "$path"
+done
 
 if [ "$REMOVE_IMAGES" = "true" ] && command -v docker >/dev/null 2>&1; then
   docker image ls --format '{{.Repository}}:{{.Tag}}' \
