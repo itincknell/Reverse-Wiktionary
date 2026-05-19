@@ -23,7 +23,7 @@ class QdrantSearchConfig:
 
     url: str
     collection_name: str
-    hnsw_ef: int | None = 64
+    hnsw_ef: int | None = 512
     acorn_max_selectivity: float = 1.0
     exact_filtered: bool = False
     language_facet_limit: int = 10_000

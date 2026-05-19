@@ -223,7 +223,7 @@ collection.
   --storage-account "$STORAGE_ACCOUNT" \
   --container "$CONTAINER" \
   --collection-name "$COLLECTION_NAME" \
-  --qdrant-hnsw-ef 64
+  --qdrant-hnsw-ef 512
 ```
 
 ## SSH Tunnel Preview

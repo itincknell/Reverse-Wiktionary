@@ -69,7 +69,7 @@ def load_settings() -> WebSettings:
         model_device=os.getenv("MODEL_DEVICE", "auto"),
         qdrant_url=os.getenv("QDRANT_URL", "http://localhost:6333"),
         redis_url=os.getenv("REDIS_URL", "redis://localhost:6379/0"),
-        qdrant_hnsw_ef=_int_env("QDRANT_HNSW_EF", 64),
+        qdrant_hnsw_ef=_int_env("QDRANT_HNSW_EF", 512),
         qdrant_acorn_max_selectivity=_float_env("QDRANT_ACORN_MAX_SELECTIVITY", 1.0),
         search_exact_filtered=_bool_env("SEARCH_EXACT_FILTERED", False),
         default_limit=_int_env("DEFAULT_LIMIT", DEFAULT_LIMIT),

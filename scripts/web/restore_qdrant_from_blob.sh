@@ -135,7 +135,7 @@ fi
 
 workDir="$dataRoot/restore"
 snapshotRoot="$dataRoot/snapshots"
-processedDir="data/processed/latest"
+processedDir="$dataRoot/processed/latest"
 mkdir -p "$workDir" "$snapshotRoot" "$processedDir"
 
 if [ -z "$runId" ]; then

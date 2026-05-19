@@ -38,7 +38,7 @@ public edge: Cloudflare Tunnel in front of Nginx
 ## Retrieval Policy
 
 ```text
-no filters: hnsw_ef configurable, beta default 64
+no filters: hnsw_ef configurable, beta default 512
 language or POS filters: hnsw_ef + ACORN max_selectivity=1.0
 diagnostic override: SEARCH_EXACT_FILTERED=true
 serving collection: scalar int8 quantization, original vectors on disk

@@ -350,7 +350,7 @@ runs/web_serving/20260518-quantized-sizing.md
   "available_langs": 0,
   "available_pos": 9,
   "language_taxonomy_families": 0,
-  "qdrant_hnsw_ef": 64,
+  "qdrant_hnsw_ef": 512,
   "qdrant_acorn_max_selectivity": 1.0,
   "search_exact_filtered": false
 }
