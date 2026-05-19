@@ -102,7 +102,17 @@ fi
 export REVERSE_WIKTIONARY_DATA_ROOT="$dataRoot"
 ./scripts/web/prepare_prod_dirs.sh
 
-composeArgs=(-f deploy/web/compose.prod.yml)
+restorePortOverride="$(mktemp /tmp/reverse-wiktionary-qdrant-restore.XXXXXX.yml)"
+trap 'rm -f "$restorePortOverride"' EXIT
+
+cat >"$restorePortOverride" <<'EOF'
+services:
+  qdrant:
+    ports:
+      - "127.0.0.1:6333:6333"
+EOF
+
+composeArgs=(-f deploy/web/compose.prod.yml -f "$restorePortOverride")
 if [ -f deploy/web/.env ]; then
   composeArgs=(--env-file deploy/web/.env "${composeArgs[@]}")
 fi
