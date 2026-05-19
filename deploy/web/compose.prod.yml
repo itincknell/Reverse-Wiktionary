@@ -19,6 +19,7 @@ services:
     restart: unless-stopped
 
   web:
+    image: ${WEB_IMAGE:-reverse-wiktionary-web:latest}
     build:
       context: ../..
       dockerfile: deploy/web/Dockerfile

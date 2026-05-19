@@ -200,6 +200,45 @@ Nginx: bound to 127.0.0.1:8080 on the VM
 Cloudflare Tunnel: outbound-only public path
 ```
 
+## Web Image Archive
+
+The web image contains the query encoder runtime and its PyTorch dependency
+tree. Building it directly on the small beta VM is slow, so deployment can load
+a prebuilt Docker archive instead of rebuilding locally.
+
+Build and save:
+
+```bash
+scripts/web/build_web_image_archive.sh \
+  --tag "$(git rev-parse --short=12 HEAD)" \
+  --upload \
+  --storage-account "$STORAGE_ACCOUNT" \
+  --container "$CONTAINER"
+```
+
+Load on the VM:
+
+```bash
+az storage blob download \
+  --account-name "$STORAGE_ACCOUNT" \
+  --container-name "$CONTAINER" \
+  --name "docker-images/<git_sha>/reverse-wiktionary-web-<git_sha>.tar.gz" \
+  --file "/opt/reverse-wiktionary/data/restore/reverse-wiktionary-web.tar.gz" \
+  --auth-mode login \
+  --overwrite
+
+cd /opt/reverse-wiktionary/app
+scripts/web/load_web_image_archive.sh \
+  --archive /opt/reverse-wiktionary/data/restore/reverse-wiktionary-web.tar.gz
+```
+
+Use the loaded image without rebuilding:
+
+```text
+WEB_IMAGE=reverse-wiktionary-web:<git_sha>
+WEB_SKIP_BUILD=true
+```
+
 ## Restore Serving Artifacts
 
 ```bash

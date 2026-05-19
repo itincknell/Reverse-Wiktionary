@@ -246,6 +246,10 @@ Nginx reverse proxy
 OS disk for durable Qdrant storage
 ```
 
+The web image can be built once and loaded from a Docker archive on small beta
+hosts. This keeps the PyTorch/model dependency build off the deployment VM while
+still allowing Git-based source control for configuration and templates.
+
 Initial FastAPI worker count:
 
 ```text

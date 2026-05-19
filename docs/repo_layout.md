@@ -16,7 +16,8 @@ src/search/       Query encoding, API schemas, Qdrant filters, search client.
 src/common/       Small runtime constants/helpers shared by web/search code.
 deploy/web/       Docker Compose, web Dockerfile, Nginx config.
 deploy/compose/   Local Qdrant Compose helper.
-scripts/web/      Local/prod serving operations, smoke checks, benchmarks.
+scripts/web/      Local/prod serving operations, image archives, smoke checks,
+                  benchmarks.
 scripts/azure/    Azure VM bootstrap and remote web smoke entrypoints.
 scripts/qdrant/   Serving-side Qdrant verification/tuning helpers.
 docs/             Serving architecture, artifact contracts, runbooks.
