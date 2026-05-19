@@ -328,9 +328,9 @@ disk: 64 GiB Standard SSD OS disk
 estimated cost: about $60/mo
 ```
 
-The v2 artifact set uses 512-dimensional vectors with scalar int8 quantization
-before snapshotting. This reduces vector-sized storage and cache pressure by
-about one third while keeping the product scope intact.
+The current v3 artifact set uses 768-dimensional vectors with scalar int8
+quantization before snapshotting. A 512-dimensional beta artifact reduced
+memory pressure but did not meet filtered retrieval quality requirements.
 
 Committed run summaries:
 
@@ -348,9 +348,9 @@ runs/web_serving/20260518-quantized-sizing.md
   "status": "ok",
   "qdrant": "ok",
   "redis": "ok",
-  "collection": "reverse_wiktionary_v2",
+  "collection": "reverse_wiktionary_v3",
   "model": "loaded",
-  "vector_size": 512,
+  "vector_size": 768,
   "available_langs": 0,
   "available_pos": 9,
   "language_taxonomy_families": 0,

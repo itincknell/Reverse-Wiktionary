@@ -364,7 +364,7 @@ textarea:focus,
 }
 
 .result-header h2 a {
-  color: var(--ink);
+  color: var(--accent-dark);
   text-decoration: none;
 }
 

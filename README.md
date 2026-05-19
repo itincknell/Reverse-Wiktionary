@@ -31,16 +31,17 @@ this repo:
 ## Current Serving Baseline
 
 ```text
-collection_name: reverse_wiktionary_v2
-current model: sentence-transformers/distiluse-base-multilingual-cased-v2
-current vector_size: 512
+collection_name: reverse_wiktionary_v3
+current model: sentence-transformers/all-mpnet-base-v2
+current vector_size: 768
 indexed points: 3,869,247
 filtered retrieval: Qdrant ACORN
 compression: scalar int8 quantization, original vectors on disk
 ```
 
-This v2 artifact shape is intended to fit a smaller, cheaper serving VM than
-the original 768-dimensional collection.
+This v3 artifact restores the 768-dimensional embedding model after the
+512-dimensional beta artifact did not meet filtered retrieval quality
+requirements.
 
 ## Design Documents
 

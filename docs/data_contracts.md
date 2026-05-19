@@ -43,9 +43,9 @@ indexes/latest.json
 Expected serving collection:
 
 ```text
-collection_name: reverse_wiktionary_v2
-model: sentence-transformers/distiluse-base-multilingual-cased-v2
-vector_size: 512
+collection_name: reverse_wiktionary_v3
+model: sentence-transformers/all-mpnet-base-v2
+vector_size: 768
 distance: Cosine
 payload indexes: lang, pos
 quantization: scalar int8
