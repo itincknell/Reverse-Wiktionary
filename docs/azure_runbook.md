@@ -222,7 +222,7 @@ Load on the VM:
 az storage blob download \
   --account-name "$STORAGE_ACCOUNT" \
   --container-name "$CONTAINER" \
-  --name "docker-images/<git_sha>/reverse-wiktionary-web-<git_sha>.tar.gz" \
+  --name "docker-images/web/<git_sha>/reverse-wiktionary-web-<git_sha>.tar.gz" \
   --file "/opt/reverse-wiktionary/data/restore/reverse-wiktionary-web.tar.gz" \
   --auth-mode login \
   --overwrite

@@ -16,9 +16,18 @@ Options:
 USAGE
 }
 
+require_value() {
+  if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+    echo "$1 requires a value" >&2
+    usage >&2
+    exit 1
+  fi
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --archive)
+      require_value "$@"
       ARCHIVE_PATH="$2"
       shift 2
       ;;
@@ -42,6 +51,16 @@ fi
 
 if [ ! -f "$ARCHIVE_PATH" ]; then
   echo "Archive not found: $ARCHIVE_PATH" >&2
+  exit 1
+fi
+
+if ! command -v docker >/dev/null 2>&1; then
+  echo "Required command not found: docker" >&2
+  exit 1
+fi
+
+if ! command -v gzip >/dev/null 2>&1; then
+  echo "Required command not found: gzip" >&2
   exit 1
 fi
 

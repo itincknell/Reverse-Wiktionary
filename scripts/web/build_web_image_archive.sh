@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Build the serving web image and save it as a gzip-compressed Docker archive.
-# This avoids rebuilding the large torch/sentence-transformers layer on small
-# deployment VMs.
+# Small deployment VMs can then load the image without rebuilding the PyTorch
+# and sentence-transformers dependency layer.
 
 IMAGE_NAME="${WEB_IMAGE_NAME:-reverse-wiktionary-web}"
 TAG="${WEB_IMAGE_TAG:-}"
@@ -11,7 +11,7 @@ OUTPUT_DIR="${WEB_IMAGE_ARCHIVE_DIR:-data/docker-images}"
 UPLOAD="false"
 STORAGE_ACCOUNT=""
 CONTAINER=""
-BLOB_PREFIX="docker-images"
+BLOB_PREFIX="docker-images/web"
 
 usage() {
   cat <<'USAGE'
@@ -32,21 +32,32 @@ Options:
   --container NAME
       Azure Blob container used with --upload.
   --blob-prefix PATH
-      Blob prefix used with --upload. Defaults to docker-images.
+      Blob prefix used with --upload. Defaults to docker-images/web.
 USAGE
+}
+
+require_value() {
+  if [ "$#" -lt 2 ] || [ -z "$2" ]; then
+    echo "$1 requires a value" >&2
+    usage >&2
+    exit 1
+  fi
 }
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --image-name)
+      require_value "$@"
       IMAGE_NAME="$2"
       shift 2
       ;;
     --tag)
+      require_value "$@"
       TAG="$2"
       shift 2
       ;;
     --output-dir)
+      require_value "$@"
       OUTPUT_DIR="$2"
       shift 2
       ;;
@@ -55,14 +66,17 @@ while [ "$#" -gt 0 ]; do
       shift
       ;;
     --storage-account)
+      require_value "$@"
       STORAGE_ACCOUNT="$2"
       shift 2
       ;;
     --container)
+      require_value "$@"
       CONTAINER="$2"
       shift 2
       ;;
     --blob-prefix)
+      require_value "$@"
       BLOB_PREFIX="$2"
       shift 2
       ;;
