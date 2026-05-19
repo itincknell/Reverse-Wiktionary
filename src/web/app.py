@@ -46,6 +46,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     app.state.language_taxonomy = {"families": []}
 
     templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
+    templates.env.globals["asset_version"] = settings.asset_version
     app.state.templates = templates
 
     app.mount(
@@ -115,6 +116,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             "available_langs": len(app.state.available_langs),
             "available_pos": len(app.state.available_pos),
             "language_taxonomy_families": len(app.state.language_taxonomy["families"]),
+            "asset_version": settings.asset_version,
             "qdrant_hnsw_ef": settings.qdrant_hnsw_ef,
             "qdrant_acorn_max_selectivity": settings.qdrant_acorn_max_selectivity,
             "search_exact_filtered": settings.search_exact_filtered,

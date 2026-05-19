@@ -37,10 +37,10 @@
   </section>
 </main>
 
-<script src="/static/language_filters.js"></script>
+<script src="/static/language_filters.js?v={{ asset_version }}"></script>
 <script>
   ReverseWiktionaryLanguageFilters.initializeLanguageFilters();
 </script>
 <script src="https://unpkg.com/htmx.org@2.0.4"></script>
-<script src="/static/search_ui.js"></script>
+<script src="/static/search_ui.js?v={{ asset_version }}"></script>
 {% endblock %}

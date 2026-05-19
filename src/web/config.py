@@ -33,6 +33,7 @@ class WebSettings:
     log_level: str
     language_taxonomy_path: str
     serving_metadata_path: str
+    asset_version: str
 
 
 def _int_env(name: str, default: int) -> int:
@@ -86,4 +87,5 @@ def load_settings() -> WebSettings:
             "SERVING_METADATA_PATH",
             "data/processed/latest/serving_metadata.json",
         ),
+        asset_version=os.getenv("ASSET_VERSION", "dev"),
     )
