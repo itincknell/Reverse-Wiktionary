@@ -27,8 +27,8 @@ Usage:
 
 Restores a Qdrant collection from the serving snapshot pointed to by
 indexes/latest.json, or from indexes/<run_id>/manifest.json when --run-id is
-provided. Also stages language_taxonomy.json and serving_metadata.json from
-processed/latest.json for the web app.
+provided. Also stages serving_metadata.json and, when present,
+language_taxonomy.json from processed/latest.json for the web app.
 USAGE
 }
 
@@ -245,14 +245,26 @@ if [ -z "$processedRunId" ] || [ "$processedRunId" = "null" ]; then
   exit 1
 fi
 
-az storage blob download \
+taxonomyBlob="processed/$processedRunId/language_taxonomy.json"
+if [ "$(az storage blob exists \
   --account-name "$storageAccount" \
   --container-name "$container" \
-  --name "processed/$processedRunId/language_taxonomy.json" \
-  --file "$processedDir/language_taxonomy.json" \
+  --name "$taxonomyBlob" \
   --auth-mode login \
-  --overwrite \
-  --output none
+  --query exists \
+  --output tsv)" = "true" ]; then
+  az storage blob download \
+    --account-name "$storageAccount" \
+    --container-name "$container" \
+    --name "$taxonomyBlob" \
+    --file "$processedDir/language_taxonomy.json" \
+    --auth-mode login \
+    --overwrite \
+    --output none
+else
+  rm -f "$processedDir/language_taxonomy.json"
+  echo "language taxonomy not found; web app will use Qdrant language facets"
+fi
 
 az storage blob download \
   --account-name "$storageAccount" \
