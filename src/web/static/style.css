@@ -170,6 +170,11 @@ textarea:focus,
   gap: 8px;
 }
 
+[data-language-inputs]:empty,
+.language-search-results[hidden] {
+  display: none;
+}
+
 .selected-filters {
   padding-top: 4px;
 }
@@ -179,6 +184,10 @@ textarea:focus,
   flex-wrap: wrap;
   gap: 6px;
   min-height: 30px;
+}
+
+.filter-chips:empty {
+  min-height: 0;
 }
 
 .filter-chip {
@@ -474,18 +483,25 @@ details summary {
     min-height: auto;
     padding: 18px 18px 2px;
     border-right: 0;
-    border-bottom: 0;
+    border-bottom: 1px solid var(--line);
     overflow: visible;
   }
 
   .search-form {
-    gap: 10px;
+    gap: 8px;
+  }
+
+  .filter-section {
+    gap: 0;
   }
 
   .filter-panel {
     border-top: 1px solid var(--line);
-    padding-top: 4px;
     margin: 0;
+  }
+
+  .filter-panel + .filter-panel {
+    margin-top: 0;
   }
 
   .filter-panel-summary {
@@ -494,6 +510,7 @@ details summary {
     justify-content: flex-start;
     gap: 8px;
     min-height: 24px;
+    padding: 2px 0;
     cursor: pointer;
   }
 
@@ -519,16 +536,22 @@ details summary {
   }
 
   .filter-panel-body {
-    gap: 6px;
+    gap: 4px;
     padding-top: 0;
   }
 
   .filter-panel[open] > .filter-panel-body {
     padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  .chip-empty {
+    font-size: 13px;
+    line-height: 1.25;
   }
 
   .taxonomy-tree {
-    display: none;
+    display: none !important;
   }
 
   .language-search-results {
@@ -536,6 +559,14 @@ details summary {
     border: 1px solid var(--line);
     border-radius: 6px;
     padding: 8px;
+  }
+
+  .filter-panel:has([data-language-search])[open] + .filter-panel {
+    margin-top: 6px;
+  }
+
+  .filter-panel:last-of-type {
+    margin-bottom: 8px;
   }
 
   .results-pane {
