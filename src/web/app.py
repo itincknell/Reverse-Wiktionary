@@ -125,7 +125,11 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         """
         Render the project/about page.
         """
-        return templates.TemplateResponse("about.html", {"request": request})
+        return templates.TemplateResponse(
+            request=request,
+            name="about.html",
+            context={"request": request},
+        )
 
     @app.post("/api/v1/search")
     def api_search(request: SearchRequest) -> dict[str, object]:
