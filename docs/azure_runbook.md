@@ -219,17 +219,15 @@ scripts/web/build_web_image_archive.sh \
 Load on the VM:
 
 ```bash
-az storage blob download \
-  --account-name "$STORAGE_ACCOUNT" \
-  --container-name "$CONTAINER" \
-  --name "docker-images/web/<git_sha>/reverse-wiktionary-web-<git_sha>.tar.gz" \
-  --file "/opt/reverse-wiktionary/data/restore/reverse-wiktionary-web.tar.gz" \
-  --auth-mode login \
-  --overwrite
-
 cd /opt/reverse-wiktionary/app
+
+scripts/web/download_web_image_archive.sh \
+  --storage-account "$STORAGE_ACCOUNT" \
+  --container "$CONTAINER" \
+  --tag "<git_sha>"
+
 scripts/web/load_web_image_archive.sh \
-  --archive /opt/reverse-wiktionary/data/restore/reverse-wiktionary-web.tar.gz
+  --archive "/opt/reverse-wiktionary/data/restore/reverse-wiktionary-web-<git_sha>.tar.gz"
 ```
 
 Use the loaded image without rebuilding:
@@ -237,6 +235,14 @@ Use the loaded image without rebuilding:
 ```text
 WEB_IMAGE=reverse-wiktionary-web:<git_sha>
 WEB_SKIP_BUILD=true
+```
+
+For a clean beta redeploy on an existing VM:
+
+```bash
+cd /opt/reverse-wiktionary/app
+
+scripts/web/reset_prod_state.sh --yes --remove-images
 ```
 
 ## Restore Serving Artifacts

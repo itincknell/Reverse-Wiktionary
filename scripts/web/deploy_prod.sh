@@ -18,7 +18,7 @@ fi
 ./scripts/web/prepare_prod_dirs.sh
 
 if [ "$WEB_SKIP_BUILD" = "true" ]; then
-  docker compose "${COMPOSE_ARGS[@]}" up -d
+  docker compose "${COMPOSE_ARGS[@]}" up -d --no-build
 else
   docker compose "${COMPOSE_ARGS[@]}" up -d --build
 fi

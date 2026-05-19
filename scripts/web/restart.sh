@@ -16,7 +16,7 @@ if [ -f "$ENV_FILE" ]; then
 fi
 
 if [ "$WEB_SKIP_BUILD" = "true" ]; then
-  docker compose "${COMPOSE_ARGS[@]}" up -d "$SERVICE"
+  docker compose "${COMPOSE_ARGS[@]}" up -d --no-build "$SERVICE"
 else
   docker compose "${COMPOSE_ARGS[@]}" up -d --build "$SERVICE"
 fi
