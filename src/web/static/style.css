@@ -139,6 +139,24 @@ textarea:focus,
   gap: 8px;
 }
 
+.filter-panel {
+  border: 0;
+}
+
+.filter-panel-summary {
+  display: block;
+  list-style: none;
+}
+
+.filter-panel-summary::-webkit-details-marker {
+  display: none;
+}
+
+.filter-panel-body {
+  display: grid;
+  gap: 8px;
+}
+
 .selected-filters {
   padding-top: 4px;
 }
@@ -422,12 +440,98 @@ details summary {
 }
 
 @media (max-width: 760px) {
+  .site-header {
+    padding: 18px 20px;
+  }
+
+  .brand-link {
+    font-size: 23px;
+  }
+
   .workspace {
     grid-template-columns: 1fr;
   }
 
   .controls {
+    padding: 18px;
     border-right: 0;
     border-bottom: 1px solid var(--line);
+    overflow: visible;
+  }
+
+  .search-form {
+    gap: 14px;
+  }
+
+  textarea {
+    min-height: 120px;
+  }
+
+  .filter-panel {
+    border-top: 1px solid var(--line);
+    padding-top: 10px;
+  }
+
+  .filter-panel-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    cursor: pointer;
+  }
+
+  .filter-panel-summary::after {
+    content: "+";
+    display: inline-grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    color: var(--accent-dark);
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+  }
+
+  .filter-panel[open] > .filter-panel-summary::after {
+    content: "-";
+  }
+
+  .filter-panel-summary .section-heading {
+    margin-bottom: 0;
+  }
+
+  .filter-panel-body {
+    padding-top: 10px;
+  }
+
+  .taxonomy-tree {
+    display: none;
+  }
+
+  .language-search-results {
+    max-height: 128px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 8px;
+  }
+
+  .filter-options.tall {
+    max-height: 128px;
+  }
+
+  .results-pane {
+    padding: 18px;
+  }
+
+  .result-header {
+    display: grid;
+    gap: 10px;
+  }
+
+  .expansion {
+    max-width: none;
+    text-align: left;
   }
 }

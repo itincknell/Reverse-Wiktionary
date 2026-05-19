@@ -733,7 +733,7 @@
         return;
       }
 
-      const matches = this.state.searchOnlyLanguages(query).slice(0, 50);
+      const matches = this.searchResultLanguages(query).slice(0, 50);
       if (matches.length === 0) {
         this.searchResults.hidden = true;
         return;
@@ -755,6 +755,16 @@
         row.appendChild(label);
         this.searchResults.appendChild(row);
       });
+    }
+
+    searchResultLanguages(query) {
+      if (isMobileViewport()) {
+        return Array.from(this.state.languageById.values())
+          .filter((language) => language.label.toLowerCase().includes(query))
+          .sort((left, right) => left.label.localeCompare(right.label));
+      }
+
+      return this.state.searchOnlyLanguages(query);
     }
   }
 
@@ -825,6 +835,10 @@
 
   function arraysEqual(left, right) {
     return left.length === right.length && left.every((value, index) => value === right[index]);
+  }
+
+  function isMobileViewport() {
+    return typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches;
   }
 
   return {

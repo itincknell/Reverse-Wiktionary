@@ -9,6 +9,7 @@
         hx-target="#results"
         hx-swap="innerHTML"
         class="search-form"
+        data-search-form
       >
         <label class="field-label" for="query">Search prompt</label>
         <textarea
@@ -41,4 +42,5 @@
   ReverseWiktionaryLanguageFilters.initializeLanguageFilters();
 </script>
 <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+<script src="/static/search_ui.js"></script>
 {% endblock %}
