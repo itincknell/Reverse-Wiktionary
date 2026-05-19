@@ -128,6 +128,15 @@ textarea,
   font: inherit;
 }
 
+textarea {
+  height: 74px;
+  min-height: 74px;
+  max-height: 74px;
+  line-height: 1.35;
+  overflow: auto;
+  resize: none;
+}
+
 textarea:focus,
 .filter-search:focus {
   outline: 2px solid var(--focus);
@@ -146,6 +155,10 @@ textarea:focus,
 .filter-panel-summary {
   display: block;
   list-style: none;
+}
+
+.filter-panel-summary::marker {
+  content: "";
 }
 
 .filter-panel-summary::-webkit-details-marker {
@@ -448,54 +461,57 @@ details summary {
     font-size: 23px;
   }
 
+  .app-shell,
   .workspace {
-    grid-template-columns: 1fr;
+    min-height: 0;
+  }
+
+  .workspace {
+    display: block;
   }
 
   .controls {
-    padding: 18px;
+    min-height: auto;
+    padding: 18px 18px 2px;
     border-right: 0;
-    border-bottom: 1px solid var(--line);
+    border-bottom: 0;
     overflow: visible;
   }
 
   .search-form {
-    gap: 14px;
-  }
-
-  textarea {
-    min-height: 120px;
+    gap: 10px;
   }
 
   .filter-panel {
     border-top: 1px solid var(--line);
-    padding-top: 10px;
+    padding-top: 4px;
+    margin: 0;
   }
 
   .filter-panel-summary {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    justify-content: flex-start;
+    gap: 8px;
+    min-height: 24px;
     cursor: pointer;
   }
 
-  .filter-panel-summary::after {
-    content: "+";
-    display: inline-grid;
-    place-items: center;
-    width: 24px;
-    height: 24px;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    color: var(--accent-dark);
-    font-size: 18px;
-    font-weight: 700;
-    line-height: 1;
+  .filter-panel-summary::before {
+    content: "";
+    display: inline-block;
+    width: 0;
+    height: 0;
+    border-top: 4px solid transparent;
+    border-bottom: 4px solid transparent;
+    border-left: 6px solid var(--accent-dark);
+    flex: 0 0 auto;
+    margin-left: 2px;
+    transition: transform 120ms ease;
   }
 
-  .filter-panel[open] > .filter-panel-summary::after {
-    content: "-";
+  .filter-panel[open] > .filter-panel-summary::before {
+    transform: rotate(90deg);
   }
 
   .filter-panel-summary .section-heading {
@@ -503,7 +519,12 @@ details summary {
   }
 
   .filter-panel-body {
-    padding-top: 10px;
+    gap: 6px;
+    padding-top: 0;
+  }
+
+  .filter-panel[open] > .filter-panel-body {
+    padding-top: 6px;
   }
 
   .taxonomy-tree {
@@ -517,12 +538,8 @@ details summary {
     padding: 8px;
   }
 
-  .filter-options.tall {
-    max-height: 128px;
-  }
-
   .results-pane {
-    padding: 18px;
+    padding: 4px 18px 18px;
   }
 
   .result-header {
