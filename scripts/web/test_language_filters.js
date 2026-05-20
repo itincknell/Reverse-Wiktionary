@@ -155,6 +155,45 @@ function testSearchOnlyLanguagesParticipateInAll() {
   assertDeepEqual(chipLabels(state), ["All languages"], "search-only language can be restored");
 }
 
+function testSearchOnlyLanguagesKeepDisplayTaxonomy() {
+  const state = new LanguageFilterState({
+    families,
+    allLanguages: [
+      { label: "Esperanto", family: "Artificial Language", branch: "Esperantic" },
+      { label: "Pictish", family: "Unclassifiable", branch: "Unclassifiable" },
+      { label: "Malay", family: "Bookkeeping", branch: "Bookkeeping" },
+      { label: "Alawa", family: "Mangarrayi-Maran", branch: "Maran" },
+    ],
+  });
+
+  const esperanto = state.languageById.get(state.languageIdByLabel.get("Esperanto"));
+  const pictish = state.languageById.get(state.languageIdByLabel.get("Pictish"));
+  const malay = state.languageById.get(state.languageIdByLabel.get("Malay"));
+  const alawa = state.languageById.get(state.languageIdByLabel.get("Alawa"));
+
+  assertDeepEqual(
+    [state.familyById.get(esperanto.family_id).label, state.branchById.get(esperanto.branch_id).label],
+    ["Artificial Language", "Esperantic"],
+    "artificial language keeps display taxonomy"
+  );
+  assertDeepEqual(
+    [state.familyById.get(pictish.family_id).label, state.branchById.get(pictish.branch_id).label],
+    ["Unclassified", ""],
+    "unclassifiable bucket displays as unclassified"
+  );
+  assertDeepEqual(
+    [state.familyById.get(malay.family_id).label, state.branchById.get(malay.branch_id).label],
+    ["Unclassified", ""],
+    "bookkeeping bucket displays as unclassified"
+  );
+  assertDeepEqual(
+    [state.familyById.get(alawa.family_id).label, state.branchById.get(alawa.branch_id).label],
+    ["Mangarrayi-Maran", "Maran"],
+    "matched hidden line family keeps taxonomy"
+  );
+}
+
 testFamilyExclusionWithLanguageAddBacks();
 testAllExclusionWithBranchAddBack();
 testSearchOnlyLanguagesParticipateInAll();
+testSearchOnlyLanguagesKeepDisplayTaxonomy();

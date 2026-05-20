@@ -11,6 +11,18 @@
   <div class="filter-panel-body">
     <p class="chip-empty" data-filter-chip-empty>No filters selected.</p>
     <div class="filter-chips" data-filter-chips></div>
+    <p class="filter-warning" data-filter-size-warning hidden>
+      This filter set is very small; matching words may be hard to find.
+    </p>
+    <button
+      class="secondary-button clear-filters-button"
+      type="button"
+      data-clear-filters
+      aria-label="Clear selected filters"
+      disabled
+    >
+      No filters selected
+    </button>
   </div>
 </details>
 
@@ -19,12 +31,19 @@
     <span class="section-heading">Languages</span>
   </summary>
   <div class="filter-panel-body">
-    <input
-      class="filter-search"
-      type="search"
-      placeholder="Find languages"
-      data-language-search
-    >
+    <div class="language-search-box">
+      <input
+        class="filter-search"
+        type="search"
+        placeholder="Find languages"
+        data-language-search
+      >
+      <div
+        class="language-search-results"
+        data-language-search-results
+        hidden
+      ></div>
+    </div>
     <div data-language-inputs></div>
     <div
       id="language-options"
@@ -33,6 +52,11 @@
       data-selected-langs='{{ state.selected_langs|tojson }}'
       data-all-languages='{{ language_taxonomy.all_languages|tojson }}'
     >
+      <div class="taxonomy-tree-actions" aria-label="Language tree controls">
+        <button class="link-button" type="button" data-taxonomy-expand-all>Expand all</button>
+        <button class="link-button" type="button" data-taxonomy-collapse-all>Collapse all</button>
+      </div>
+
       <label class="check-row taxonomy-control" data-language-select-all-row>
         <input type="checkbox" data-language-select-all>
         <span data-language-select-all-label>Select all</span>
@@ -43,6 +67,7 @@
           class="taxonomy-family"
           data-family-id="{{ family.id }}"
           data-family-label="{{ family.label|e }}"
+          data-row-count="{{ family.rows }}"
         >
           <summary>
             <label class="check-row taxonomy-summary" data-language-group-row>
@@ -51,7 +76,8 @@
                 data-language-group="family"
                 data-group-id="{{ family.id }}"
               >
-              <span>{{ family.label }}</span>
+              <span class="filter-label">{{ family.label }}</span>
+              <span class="filter-count">({{ family.rows }})</span>
             </label>
           </summary>
           <div class="taxonomy-branches">
@@ -60,6 +86,7 @@
                 class="taxonomy-branch"
                 data-branch-id="{{ branch.id }}"
                 data-branch-label="{{ branch.label|e }}"
+                data-row-count="{{ branch.rows }}"
               >
                 <summary>
                   <label class="check-row taxonomy-summary" data-language-group-row>
@@ -68,7 +95,8 @@
                       data-language-group="branch"
                       data-group-id="{{ branch.id }}"
                     >
-                    <span>{{ branch.label }}</span>
+                    <span class="filter-label">{{ branch.label }}</span>
+                    <span class="filter-count">({{ branch.rows }})</span>
                   </label>
                 </summary>
                 <div class="taxonomy-languages">
@@ -78,6 +106,7 @@
                       data-language-row
                       data-language-id="{{ language.id }}"
                       data-language-label="{{ language.label|lower|e }}"
+                      data-row-count="{{ language.rows }}"
                     >
                       <input
                         type="checkbox"
@@ -85,7 +114,8 @@
                         data-language-id="{{ language.id }}"
                         value="{{ language.label }}"
                       >
-                      <span>{{ language.label }}</span>
+                      <span class="filter-label">{{ language.label }}</span>
+                      <span class="filter-count">({{ language.rows }})</span>
                     </label>
                   {% endfor %}
                 </div>
@@ -95,11 +125,6 @@
         </details>
       {% endfor %}
     </div>
-    <div
-      class="language-search-results"
-      data-language-search-results
-      hidden
-    ></div>
   </div>
 </details>
 

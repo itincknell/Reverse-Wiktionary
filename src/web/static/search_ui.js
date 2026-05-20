@@ -19,6 +19,7 @@
         }
         panel.setAttribute("open", "");
       });
+      document.documentElement.classList.add("filter-ui-ready");
     }
 
     panels.forEach((panel) => {
@@ -53,9 +54,16 @@
   }
 
   function initializeResultScrolling() {
+    const media = window.matchMedia(MOBILE_QUERY);
+    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let pendingScrollMode = null;
 
     document.body.addEventListener("htmx:beforeRequest", (event) => {
+      if (!media.matches) {
+        pendingScrollMode = null;
+        return;
+      }
+
       const trigger = event.detail.elt;
       if (trigger?.matches("[data-search-form]")) {
         pendingScrollMode = "first";
@@ -65,7 +73,8 @@
     });
 
     document.body.addEventListener("htmx:afterSwap", () => {
-      if (!pendingScrollMode) {
+      if (!pendingScrollMode || !media.matches) {
+        pendingScrollMode = null;
         return;
       }
 
@@ -76,8 +85,25 @@
       pendingScrollMode = null;
 
       if (target) {
-        target.scrollIntoView({ behavior: "smooth", block: "start" });
+        target.scrollIntoView({
+          behavior: reducedMotion.matches ? "auto" : "smooth",
+          block: "start",
+        });
       }
+    });
+  }
+
+  function initializeQueryClear() {
+    const query = document.querySelector("#query");
+    const clearButton = document.querySelector("[data-clear-query]");
+
+    if (!query || !clearButton) {
+      return;
+    }
+
+    clearButton.addEventListener("click", () => {
+      query.value = "";
+      query.focus();
     });
   }
 
@@ -85,9 +111,11 @@
     document.addEventListener("DOMContentLoaded", () => {
       initializeMobilePanels();
       initializeResultScrolling();
+      initializeQueryClear();
     });
   } else {
     initializeMobilePanels();
     initializeResultScrolling();
+    initializeQueryClear();
   }
 })();

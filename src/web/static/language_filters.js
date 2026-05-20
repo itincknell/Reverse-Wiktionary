@@ -23,6 +23,8 @@
       this.languagesByBranch = new Map();
       this.branchById = new Map();
       this.familyById = new Map();
+      this.familyIdByLabel = new Map();
+      this.branchIdByFamilyAndLabel = new Map();
       this.selectedLanguages = new Set();
       this.selectionIntents = [];
       this.intentClock = 0;
@@ -45,22 +47,27 @@
       this.familyById.set(family.id, {
         id: family.id,
         label: family.label,
+        rows: Number(family.rows || 0),
         branches: family.branches,
       });
+      this.familyIdByLabel.set(family.label, family.id);
       this.languagesByFamily.set(family.id, []);
 
       family.branches.forEach((branch) => {
         this.branchById.set(branch.id, {
           id: branch.id,
           label: branch.label,
+          rows: Number(branch.rows || 0),
           family_id: family.id,
         });
+        this.branchIdByFamilyAndLabel.set(groupKey(family.id, branch.label), branch.id);
         this.languagesByBranch.set(branch.id, []);
 
         branch.languages.forEach((language) => {
           this.languageById.set(language.id, {
             id: language.id,
             label: language.label,
+            rows: Number(language.rows || 0),
             family_id: family.id,
             branch_id: branch.id,
           });
@@ -73,19 +80,71 @@
 
     addSearchOnlyLanguages(languages) {
       languages.forEach((language) => {
-        if (!language.label || this.languageIdByLabel.has(language.label)) {
+        const label = language.label || language.lang;
+        if (!label || this.languageIdByLabel.has(label)) {
           return;
         }
 
-        this.languageById.set(language.id, {
-          id: language.id,
-          label: language.label,
-          family_id: "",
-          branch_id: "",
+        const familyLabel = displayFamilyLabel(language.family);
+        const branchLabel = displayBranchLabel(familyLabel, language.branch);
+        const familyId = this.ensureSearchFamily(familyLabel);
+        const branchId = this.ensureSearchBranch(familyId, branchLabel);
+        const languageId = language.id || `search:${label}`;
+
+        this.languageById.set(languageId, {
+          id: languageId,
+          label,
+          rows: Number(language.rows || 0),
+          family_id: familyId,
+          branch_id: branchId,
           search_only: true,
         });
-        this.languageIdByLabel.set(language.label, language.id);
+        this.languageIdByLabel.set(label, languageId);
+        this.languagesByFamily.get(familyId).push(languageId);
+        this.languagesByBranch.get(branchId).push(languageId);
       });
+    }
+
+    ensureSearchFamily(label) {
+      const familyLabel = label || "Unclassified";
+      const existingId = this.familyIdByLabel.get(familyLabel);
+      if (existingId) {
+        return existingId;
+      }
+
+      const familyId = `search-family:${familyLabel}`;
+      const family = {
+        id: familyId,
+        label: familyLabel,
+        rows: 0,
+        branches: [],
+      };
+      this.familyById.set(familyId, family);
+      this.familyIdByLabel.set(familyLabel, familyId);
+      this.languagesByFamily.set(familyId, []);
+      return familyId;
+    }
+
+    ensureSearchBranch(familyId, label) {
+      const branchLabel = label || "";
+      const key = groupKey(familyId, branchLabel);
+      const existingId = this.branchIdByFamilyAndLabel.get(key);
+      if (existingId) {
+        return existingId;
+      }
+
+      const branchId = `search-branch:${familyId}:${branchLabel || "unclassified"}`;
+      const branch = {
+        id: branchId,
+        label: branchLabel,
+        rows: 0,
+        family_id: familyId,
+      };
+      this.branchById.set(branchId, branch);
+      this.branchIdByFamilyAndLabel.set(key, branchId);
+      this.languagesByBranch.set(branchId, []);
+      this.familyById.get(familyId).branches.push(branch);
+      return branchId;
     }
 
     createIntent(type, id) {
@@ -356,15 +415,6 @@
         .sort((left, right) => left.label.localeCompare(right.label));
     }
 
-    searchOnlyLanguages(query) {
-      const normalizedQuery = query.toLowerCase();
-      return Array.from(this.languageById.values())
-        .filter((language) => {
-          return language.search_only && language.label.toLowerCase().includes(normalizedQuery);
-        })
-        .sort((left, right) => left.label.localeCompare(right.label));
-    }
-
     chipModels() {
       return this.selectionIntents
         .map((intent) => ({
@@ -484,6 +534,8 @@
       tree,
       chipList,
       emptyState,
+      filterSizeWarning,
+      clearFilters,
       inputHost,
       selectAll,
       selectAllLabel,
@@ -492,10 +544,13 @@
       this.tree = tree;
       this.chipList = chipList;
       this.emptyState = emptyState;
+      this.filterSizeWarning = filterSizeWarning;
+      this.clearFilters = clearFilters;
       this.inputHost = inputHost;
       this.selectAll = selectAll;
       this.selectAllLabel = selectAllLabel;
       this.searchResults = searchResults;
+      this.languageFilterSearchContext = null;
       this.state = new LanguageFilterState({
         families: readFamiliesFromDom(tree),
         allLanguages: JSON.parse(tree.dataset.allLanguages || "[]"),
@@ -504,6 +559,9 @@
     }
 
     bind() {
+      const expandAll = document.querySelector("[data-taxonomy-expand-all]");
+      const collapseAll = document.querySelector("[data-taxonomy-collapse-all]");
+
       this.tree.addEventListener("click", (event) => {
         if (
           event.target.closest("[data-language-group-row]") ||
@@ -527,25 +585,136 @@
         });
       }
 
+      expandAll?.addEventListener("click", () => {
+        this.setTreeOpenState(true);
+      });
+
+      collapseAll?.addEventListener("click", () => {
+        this.setTreeOpenState(false);
+      });
+
+      this.clearFilters?.addEventListener("click", () => {
+        this.clearAllFilters();
+      });
+
       document.addEventListener("input", (event) => {
         if (event.target.matches("[data-language-search]")) {
+          if (!event.target.value.trim()) {
+            this.languageFilterSearchContext = null;
+          } else {
+            this.beginLanguageFilterSearchContext();
+          }
+          this.applyLanguageSearch(event.target.value);
+        }
+      });
+
+      document.addEventListener("focusin", (event) => {
+        if (event.target.matches("[data-language-search]")) {
+          this.beginLanguageFilterSearchContext();
           this.applyLanguageSearch(event.target.value);
         }
       });
 
       document.addEventListener("search", (event) => {
         if (event.target.matches("[data-language-search]")) {
+          if (!event.target.value.trim()) {
+            this.languageFilterSearchContext = null;
+          } else {
+            this.beginLanguageFilterSearchContext();
+          }
           this.applyLanguageSearch(event.target.value);
+        }
+      });
+
+      document.addEventListener("click", (event) => {
+        if (!this.searchResults) {
+          return;
+        }
+        if (event.target.closest(".language-search-box")) {
+          return;
+        }
+        this.hideSearchResults();
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") {
+          this.hideSearchResults();
         }
       });
 
       document.addEventListener("change", (event) => {
         if (event.target.matches("[name='pos']")) {
           this.renderChips();
+          this.syncClearFiltersButton();
         }
       });
 
       this.syncUi();
+    }
+
+    beginLanguageFilterSearchContext() {
+      if (this.languageFilterSearchContext) {
+        return;
+      }
+
+      this.languageFilterSearchContext = {
+        allSelectedAtStart: this.state.selectionIntents.some((intent) => intent.type === "all"),
+        selectedFamilyIds: this.intentIdsAtStart("family"),
+        hasFullySelectedFamilyAtStart: this.hasFullySelectedFamilyAtStart(),
+        selectedBranchIds: this.intentIdsAtStart("branch"),
+        selectedLanguageIds: this.intentIdsAtStart("language"),
+        activeFamilyIds: this.activeFamilyIdsAtStart(),
+      };
+    }
+
+    intentIdsAtStart(type) {
+      return new Set(
+        this.state.selectionIntents
+          .filter((intent) => intent.type === type)
+          .map((intent) => intent.id)
+      );
+    }
+
+    activeFamilyIdsAtStart() {
+      const familyIds = new Set();
+      this.state.selectedLanguages.forEach((languageId) => {
+        const familyId = this.state.languageById.get(languageId)?.family_id;
+        if (familyId) {
+          familyIds.add(familyId);
+        }
+      });
+      return familyIds;
+    }
+
+    hasFullySelectedFamilyAtStart() {
+      return Array.from(this.state.familyById.keys()).some((familyId) => {
+        return this.state.isFullIntent("family", familyId);
+      });
+    }
+
+    setTreeOpenState(open) {
+      this.tree.querySelectorAll(".taxonomy-family, .taxonomy-branch").forEach((details) => {
+        details.open = open;
+      });
+    }
+
+    updateLanguageFilterSearchContextAfterGroupChange(type, id, checked) {
+      if (!this.languageFilterSearchContext || !checked || type !== "branch") {
+        return;
+      }
+
+      if (
+        this.languageFilterSearchContext.allSelectedAtStart ||
+        this.languageFilterSearchContext.selectedFamilyIds.size > 0
+      ) {
+        return;
+      }
+
+      this.languageFilterSearchContext.selectedBranchIds.add(id);
+      const searchInput = document.querySelector("[data-language-search]");
+      if (searchInput?.value.trim()) {
+        this.applyLanguageSearch(searchInput.value);
+      }
     }
 
     handleLanguageChange(target) {
@@ -558,6 +727,11 @@
       if (target.matches("[data-language-group]")) {
         this.state.toggleGroup(target.dataset.languageGroup, target.dataset.groupId, target.checked);
         this.syncUi();
+        this.updateLanguageFilterSearchContextAfterGroupChange(
+          target.dataset.languageGroup,
+          target.dataset.groupId,
+          target.checked
+        );
         return;
       }
 
@@ -571,6 +745,8 @@
       this.syncCheckboxes();
       this.syncHiddenInputs();
       this.renderChips();
+      this.renderFilterSizeWarning();
+      this.syncClearFiltersButton();
     }
 
     syncCheckboxes() {
@@ -582,13 +758,14 @@
         this.searchResults.querySelectorAll("[data-language-search-checkbox]").forEach((checkbox) => {
           checkbox.checked = this.state.selectedLanguages.has(checkbox.dataset.languageId);
         });
+
+        this.searchResults.querySelectorAll("[data-language-group]").forEach((checkbox) => {
+          this.applyGroupCheckboxState(checkbox);
+        });
       }
 
       this.tree.querySelectorAll("[data-language-group]").forEach((checkbox) => {
-        const ids = this.state.groupLanguageIds(checkbox.dataset.languageGroup, checkbox.dataset.groupId);
-        const selectedCount = ids.filter((languageId) => this.state.selectedLanguages.has(languageId)).length;
-        checkbox.checked = ids.length > 0 && selectedCount === ids.length;
-        checkbox.indeterminate = selectedCount > 0 && selectedCount < ids.length;
+        this.applyGroupCheckboxState(checkbox);
       });
 
       if (this.selectAll) {
@@ -632,6 +809,49 @@
       if (this.emptyState) {
         this.emptyState.hidden = this.chipList.children.length > 0;
       }
+    }
+
+    renderFilterSizeWarning() {
+      if (!this.filterSizeWarning) {
+        return;
+      }
+
+      const hasLanguageFilter = this.state.selectedLanguages.size > 0;
+      const selectedRows = this.selectedLanguageRows();
+      this.filterSizeWarning.hidden = !hasLanguageFilter || selectedRows >= 1000;
+    }
+
+    syncClearFiltersButton() {
+      if (!this.clearFilters) {
+        return;
+      }
+
+      const hasLanguageFilters = this.state.selectedLanguages.size > 0;
+      const hasPosFilters = Boolean(document.querySelector("[name='pos']:checked"));
+      const hasFilters = hasLanguageFilters || hasPosFilters;
+      this.clearFilters.disabled = !hasFilters;
+      this.clearFilters.textContent = hasFilters ? "Clear all filters" : "No filters selected";
+    }
+
+    clearAllFilters() {
+      this.state.selectedLanguages.clear();
+      this.state.selectionIntents = [];
+      document.querySelectorAll("[name='pos']:checked").forEach((checkbox) => {
+        checkbox.checked = false;
+      });
+      this.syncUi();
+
+      const searchInput = document.querySelector("[data-language-search]");
+      if (searchInput?.value.trim()) {
+        this.languageFilterSearchContext = null;
+        this.applyLanguageSearch(searchInput.value);
+      }
+    }
+
+    selectedLanguageRows() {
+      return Array.from(this.state.selectedLanguages).reduce((total, languageId) => {
+        return total + Number(this.state.languageById.get(languageId)?.rows || 0);
+      }, 0);
     }
 
     buildLanguageChip(chipModel) {
@@ -686,42 +906,60 @@
       return chip;
     }
 
+    applyGroupCheckboxState(checkbox) {
+      const ids = this.state.groupLanguageIds(checkbox.dataset.languageGroup, checkbox.dataset.groupId);
+      const selectedCount = ids.filter((languageId) => this.state.selectedLanguages.has(languageId)).length;
+      checkbox.checked = ids.length > 0 && selectedCount === ids.length;
+      checkbox.indeterminate = selectedCount > 0 && selectedCount < ids.length;
+    }
+
     applyLanguageSearch(rawQuery) {
       const query = rawQuery.trim().toLowerCase();
-      const matchingFamilies = new Set();
+      const matches = this.searchResultGroups(query, this.languageFilterSearchContext);
+      const matchingFamilies = new Set(matches.families.map((family) => family.id));
       const matchingBranches = new Set();
+      const matchingLanguages = new Set();
+
+      matches.families.forEach((family) => {
+        family.branches.forEach((branch) => {
+          matchingBranches.add(branch.id);
+          branch.languages.forEach((language) => matchingLanguages.add(language.id));
+        });
+      });
 
       this.tree.querySelectorAll("[data-language-row]").forEach((row) => {
         const languageId = row.dataset.languageId;
-        const language = this.state.languageById.get(languageId);
-        const matches = !query || language.label.toLowerCase().includes(query);
-        row.classList.toggle("is-hidden", !matches);
-        if (matches && query) {
-          matchingFamilies.add(language.family_id);
-          matchingBranches.add(language.branch_id);
-        }
+        row.classList.toggle("is-hidden", Boolean(query) && !matchingLanguages.has(languageId));
       });
 
       this.tree.querySelectorAll("[data-branch-id]").forEach((details) => {
-        const matches = !query || matchingBranches.has(details.dataset.branchId);
-        details.classList.toggle("is-hidden", !matches);
-        if (matches && query) {
+        const isMatch = !query || matchingBranches.has(details.dataset.branchId);
+        details.classList.toggle("is-hidden", !isMatch);
+        if (isMatch && query) {
           details.open = true;
         }
       });
 
       this.tree.querySelectorAll("[data-family-id]").forEach((details) => {
-        const matches = !query || matchingFamilies.has(details.dataset.familyId);
-        details.classList.toggle("is-hidden", !matches);
-        if (matches && query) {
+        const isMatch = !query || matchingFamilies.has(details.dataset.familyId);
+        details.classList.toggle("is-hidden", !isMatch);
+        if (isMatch && query) {
           details.open = true;
         }
       });
 
-      this.renderSearchOnlyMatches(query);
+      this.renderSearchMatches(query, matches);
     }
 
-    renderSearchOnlyMatches(query) {
+    hideSearchResults() {
+      if (!this.searchResults) {
+        return;
+      }
+      this.searchResults.hidden = true;
+      this.languageFilterSearchContext = null;
+    }
+
+    renderSearchMatches(query, matches) {
       if (!this.searchResults) {
         return;
       }
@@ -733,38 +971,221 @@
         return;
       }
 
-      const matches = this.searchResultLanguages(query).slice(0, 50);
-      if (matches.length === 0) {
+      if (matches.families.length === 0) {
         this.searchResults.hidden = true;
         return;
       }
 
-      matches.forEach((language) => {
-        const row = document.createElement("label");
-        row.className = "check-row";
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.dataset.languageSearchCheckbox = "";
-        checkbox.dataset.languageId = language.id;
-        checkbox.value = language.label;
-        checkbox.checked = this.state.selectedLanguages.has(language.id);
-        row.appendChild(checkbox);
+      matches.families.forEach((family) => {
+        this.searchResults.appendChild(this.buildSearchGroupRow("family", family.id, family.label));
 
-        const label = document.createElement("span");
-        label.textContent = language.label;
-        row.appendChild(label);
-        this.searchResults.appendChild(row);
+        if (family.branches.length > 0) {
+          const branchHost = document.createElement("div");
+          branchHost.className = "language-search-branches";
+          family.branches.forEach((branch) => {
+            if (branch.label) {
+              branchHost.appendChild(this.buildSearchGroupRow("branch", branch.id, branch.label));
+            }
+
+            const languageHost = document.createElement("div");
+            languageHost.className = "language-search-languages";
+            if (!branch.label) {
+              languageHost.classList.add("language-search-languages-branchless");
+            }
+            branch.languages.forEach((language) => {
+              languageHost.appendChild(this.buildSearchLanguageRow(language));
+            });
+            branchHost.appendChild(languageHost);
+          });
+          this.searchResults.appendChild(branchHost);
+        }
+      });
+
+    }
+
+    searchResultGroups(query, context) {
+      if (!query) {
+        return { families: [] };
+      }
+
+      if (context?.allSelectedAtStart) {
+        return this.defaultLanguageFilterSearchGroups(query);
+      }
+
+      if (context?.hasFullySelectedFamilyAtStart && context.activeFamilyIds.size > 0) {
+        const results = this.defaultLanguageFilterSearchGroups(query, context.activeFamilyIds);
+        context.selectedBranchIds.forEach((branchId) => {
+          this.addFullBranchSearchContext(results.familyMap, branchId, query);
+        });
+        return this.finalizeLanguageFilterSearchGroups(results.familyMap);
+      }
+
+      const results = this.defaultLanguageFilterSearchGroups(query);
+      context?.selectedBranchIds.forEach((branchId) => {
+        this.addFullBranchSearchContext(results.familyMap, branchId, query);
+      });
+      return this.finalizeLanguageFilterSearchGroups(results.familyMap);
+    }
+
+    defaultLanguageFilterSearchGroups(query, familyScope = null) {
+      const familyMap = new Map();
+
+      this.state.familyById.forEach((family) => {
+        if (familyScope && !familyScope.has(family.id)) {
+          return;
+        }
+
+        const familyMatches = family.label.toLowerCase().includes(query);
+        if (familyMatches) {
+          this.ensureSearchFamilyResult(familyMap, family);
+        }
+
+        family.branches.forEach((branch) => {
+          const branchMatches = branch.label.toLowerCase().includes(query);
+          const branchLanguages = (this.state.languagesByBranch.get(branch.id) || [])
+            .map((languageId) => this.state.languageById.get(languageId))
+            .filter(Boolean)
+            .sort((left, right) => left.label.localeCompare(right.label));
+          const languages = branchLanguages
+            .filter((language) => {
+              return language.label.toLowerCase().includes(query);
+            });
+
+          if (branchMatches || languages.length > 0) {
+            this.addBranchSearchResult(familyMap, family, branch, languages);
+          }
+        });
+      });
+
+      return this.finalizeLanguageFilterSearchGroups(familyMap);
+    }
+
+    addFullBranchSearchContext(familyMap, branchId, query) {
+      const branch = this.state.branchById.get(branchId);
+      if (!branch) {
+        return;
+      }
+      if (!branch.label.toLowerCase().includes(query)) {
+        return;
+      }
+
+      const family = this.state.familyById.get(branch.family_id);
+      if (!family) {
+        return;
+      }
+
+      const languages = (this.state.languagesByBranch.get(branch.id) || [])
+        .map((languageId) => this.state.languageById.get(languageId))
+        .filter(Boolean)
+        .sort((left, right) => left.label.localeCompare(right.label));
+      this.addBranchSearchResult(familyMap, family, branch, languages);
+    }
+
+    ensureSearchFamilyResult(familyMap, family) {
+      if (!familyMap.has(family.id)) {
+        familyMap.set(family.id, {
+          id: family.id,
+          label: family.label,
+          rows: family.rows,
+          branches: new Map(),
+        });
+      }
+      return familyMap.get(family.id);
+    }
+
+    addBranchSearchResult(familyMap, family, branch, languages) {
+      const familyResult = this.ensureSearchFamilyResult(familyMap, family);
+      if (!familyResult.branches.has(branch.id)) {
+        familyResult.branches.set(branch.id, {
+          id: branch.id,
+          label: branch.label,
+          rows: branch.rows,
+          languages: new Map(),
+        });
+      }
+
+      const branchResult = familyResult.branches.get(branch.id);
+      languages.forEach((language) => {
+        branchResult.languages.set(language.id, language);
       });
     }
 
-    searchResultLanguages(query) {
-      if (isMobileViewport()) {
-        return Array.from(this.state.languageById.values())
-          .filter((language) => language.label.toLowerCase().includes(query))
-          .sort((left, right) => left.label.localeCompare(right.label));
-      }
+    finalizeLanguageFilterSearchGroups(familyMap) {
+      return {
+        familyMap,
+        families: Array.from(familyMap.values()).map((family) => ({
+          id: family.id,
+          label: family.label,
+          rows: family.rows,
+          branches: Array.from(family.branches.values())
+            .map((branch) => ({
+              id: branch.id,
+              label: branch.label,
+              rows: branch.rows,
+              languages: Array.from(branch.languages.values())
+                .sort((left, right) => left.label.localeCompare(right.label)),
+            }))
+            .sort((left, right) => left.label.localeCompare(right.label)),
+        })),
+      };
+    }
 
-      return this.state.searchOnlyLanguages(query);
+    buildSearchGroupRow(type, id, label) {
+      const row = document.createElement("label");
+      row.className = "check-row taxonomy-summary";
+      row.dataset.languageGroupRow = "";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.dataset.languageGroup = type;
+      checkbox.dataset.groupId = id;
+      this.applyGroupCheckboxState(checkbox);
+      row.appendChild(checkbox);
+
+      const text = document.createElement("span");
+      text.className = "filter-label";
+      text.textContent = label;
+      row.appendChild(text);
+
+      const count = this.rowCountForGroup(type, id);
+      row.appendChild(this.buildCountLabel(count));
+      return row;
+    }
+
+    buildSearchLanguageRow(language) {
+      const row = document.createElement("label");
+      row.className = "check-row";
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.dataset.languageSearchCheckbox = "";
+      checkbox.dataset.languageId = language.id;
+      checkbox.value = language.label;
+      checkbox.checked = this.state.selectedLanguages.has(language.id);
+      row.appendChild(checkbox);
+
+      const label = document.createElement("span");
+      label.className = "filter-label";
+      label.textContent = language.label;
+      row.appendChild(label);
+      row.appendChild(this.buildCountLabel(language.rows));
+      return row;
+    }
+
+    rowCountForGroup(type, id) {
+      if (type === "family") {
+        return this.state.familyById.get(id)?.rows || 0;
+      }
+      if (type === "branch") {
+        return this.state.branchById.get(id)?.rows || 0;
+      }
+      return 0;
+    }
+
+    buildCountLabel(rows) {
+      const count = document.createElement("span");
+      count.className = "filter-count";
+      count.textContent = `(${formatCount(rows)})`;
+      return count;
     }
   }
 
@@ -773,15 +1194,18 @@
       return {
         id: familyElement.dataset.familyId,
         label: familyElement.dataset.familyLabel,
+        rows: Number(familyElement.dataset.rowCount || 0),
         branches: Array.from(familyElement.querySelectorAll("[data-branch-id]")).map((branchElement) => {
           return {
             id: branchElement.dataset.branchId,
             label: branchElement.dataset.branchLabel,
+            rows: Number(branchElement.dataset.rowCount || 0),
             languages: Array.from(branchElement.querySelectorAll("[data-language-row]")).map((languageElement) => {
               const checkbox = languageElement.querySelector("[data-language-checkbox]");
               return {
                 id: languageElement.dataset.languageId,
                 label: checkbox.value,
+                rows: Number(languageElement.dataset.rowCount || 0),
               };
             }),
           };
@@ -803,10 +1227,16 @@
     return chip;
   }
 
+  function formatCount(value) {
+    return Number(value || 0).toLocaleString("en-US");
+  }
+
   function initializeLanguageFilters() {
     const tree = document.querySelector("[data-language-tree]");
     const chipList = document.querySelector("[data-filter-chips]");
     const emptyState = document.querySelector("[data-filter-chip-empty]");
+    const filterSizeWarning = document.querySelector("[data-filter-size-warning]");
+    const clearFilters = document.querySelector("[data-clear-filters]");
     const inputHost = document.querySelector("[data-language-inputs]");
     const selectAll = document.querySelector("[data-language-select-all]");
     const selectAllLabel = document.querySelector("[data-language-select-all-label]");
@@ -820,6 +1250,8 @@
       tree,
       chipList,
       emptyState,
+      filterSizeWarning,
+      clearFilters,
       inputHost,
       selectAll,
       selectAllLabel,
@@ -837,8 +1269,35 @@
     return left.length === right.length && left.every((value, index) => value === right[index]);
   }
 
-  function isMobileViewport() {
-    return typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches;
+  function groupKey(familyId, label) {
+    return `${familyId}:${label || ""}`;
+  }
+
+  function displayFamilyLabel(family) {
+    if (!family || isUnclassifiedBucket(family)) {
+      return "Unclassified";
+    }
+    return family;
+  }
+
+  function displayBranchLabel(family, branch) {
+    if (family === "Unclassified") {
+      return "";
+    }
+    if (!branch || isUnclassifiedBucket(branch) || branch === "Review") {
+      return "";
+    }
+    return branch;
+  }
+
+  function isUnclassifiedBucket(label) {
+    return [
+      "Unmatched",
+      "Unclassifiable",
+      "Bookkeeping",
+      "Speech Register",
+      "Unattested",
+    ].includes(label);
   }
 
   return {

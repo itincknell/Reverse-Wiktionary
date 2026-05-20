@@ -21,7 +21,17 @@
           required
         >{{ state.latest_query or "" }}</textarea>
 
-        <button class="primary-button" type="submit">Search</button>
+        <div class="search-actions">
+          <button class="primary-button" type="submit">Search</button>
+          <button
+            class="secondary-button clear-query-button"
+            type="button"
+            data-clear-query
+            aria-label="Clear search prompt"
+          >
+            Clear
+          </button>
+        </div>
 
         <input type="hidden" name="limit" value="{{ state.limit }}">
 
