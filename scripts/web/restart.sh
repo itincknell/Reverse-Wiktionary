@@ -1,6 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+Usage: restart.sh [service]
+
+Restarts one Docker Compose service.
+
+Environment:
+  COMPOSE_FILE     Default: deploy/web/compose.prod.yml
+  ENV_FILE         Default: deploy/web/.env
+  WEB_SKIP_BUILD   Default: false
+EOF
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
 COMPOSE_FILE="${COMPOSE_FILE:-deploy/web/compose.prod.yml}"
 ENV_FILE="${ENV_FILE:-deploy/web/.env}"
 SERVICE="${1:-web}"

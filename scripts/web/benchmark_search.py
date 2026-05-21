@@ -88,16 +88,27 @@ def main() -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--base-url", default="http://localhost:8000")
-    parser.add_argument("--queries", type=Path, default=DEFAULT_QUERIES)
-    parser.add_argument("--routes", nargs="+", choices=["api", "ui"], default=["api"])
-    parser.add_argument("--iterations", type=int, default=1)
-    parser.add_argument("--concurrency", type=int, default=1)
-    parser.add_argument("--limit", type=int, default=25)
-    parser.add_argument("--langs", nargs="*", default=[])
-    parser.add_argument("--pos", nargs="*", default=[])
-    parser.add_argument("--timeout-seconds", type=float, default=30.0)
-    parser.add_argument("--output", type=Path)
+    parser.add_argument("--base-url", default="http://localhost:8000", help="Serving base URL.")
+    parser.add_argument(
+        "--queries",
+        type=Path,
+        default=DEFAULT_QUERIES,
+        help="JSON file containing a list of query strings.",
+    )
+    parser.add_argument(
+        "--routes",
+        nargs="+",
+        choices=["api", "ui"],
+        default=["api"],
+        help="Routes to benchmark.",
+    )
+    parser.add_argument("--iterations", type=int, default=1, help="Times to repeat the query set.")
+    parser.add_argument("--concurrency", type=int, default=1, help="Maximum parallel requests.")
+    parser.add_argument("--limit", type=int, default=25, help="Search result limit per request.")
+    parser.add_argument("--langs", nargs="*", default=[], help="Optional language filters.")
+    parser.add_argument("--pos", nargs="*", default=[], help="Optional part-of-speech filters.")
+    parser.add_argument("--timeout-seconds", type=float, default=30.0, help="Per-request timeout.")
+    parser.add_argument("--output", type=Path, help="Optional path for the aggregate JSON report.")
     parser.add_argument(
         "--samples-output",
         type=Path,

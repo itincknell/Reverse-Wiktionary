@@ -1,6 +1,22 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+Usage: deploy_cloudflare.sh
+
+Deploys the production stack with the Cloudflare profile.
+
+Environment:
+  ENV_FILE  Default: deploy/web/.env
+EOF
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
 ENV_FILE="${ENV_FILE:-deploy/web/.env}"
 
 if [ -f "$ENV_FILE" ]; then

@@ -1,6 +1,25 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+Usage: deploy_prod.sh
+
+Deploys the production Docker Compose stack.
+
+Environment:
+  COMPOSE_FILE     Default: deploy/web/compose.prod.yml
+  ENV_FILE         Default: deploy/web/.env
+  WEB_URL          Default: http://127.0.0.1:8080
+  WEB_SKIP_BUILD   Default: false
+EOF
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
 COMPOSE_FILE="${COMPOSE_FILE:-deploy/web/compose.prod.yml}"
 ENV_FILE="${ENV_FILE:-deploy/web/.env}"
 WEB_URL="${WEB_URL:-http://127.0.0.1:8080}"

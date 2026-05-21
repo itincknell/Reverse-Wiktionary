@@ -1,6 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+Usage: run_local_web.sh
+
+Starts the local web service with uvicorn.
+
+Environment:
+  HOST                           Default: 127.0.0.1
+  PORT                           Default: 8000
+  WEB_WORKERS                    Default: 1
+  COLLECTION_NAME                Default: reverse_wiktionary_v3
+  MODEL_NAME                     Default: sentence-transformers/all-mpnet-base-v2
+  MODEL_DEVICE                   Default: auto
+  QDRANT_URL                     Default: http://localhost:6333
+  QDRANT_HNSW_EF                 Default: 512
+  QDRANT_ACORN_MAX_SELECTIVITY   Default: 1.0
+  REDIS_URL                      Default: redis://localhost:6379/0
+EOF
+}
+
+if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
 HOST="${HOST:-127.0.0.1}"
 PORT="${PORT:-8000}"
 WORKERS="${WEB_WORKERS:-1}"
