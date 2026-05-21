@@ -7,12 +7,12 @@ This file tracks the serving phase. Architecture details live in
 
 ```text
 repository role: online serving/deployment only
-offline producer: github.com/itincknell/Reverse-Wiktionary-Offline
+offline producer: https://github.com/itincknell/Reverse-Wiktionary-Offline
 reverse proxy: Nginx
 web server: FastAPI/Uvicorn
 session state: Redis with TTL
 pagination: Load more button
-language source: Qdrant facet at startup, taxonomy artifact when available
+language source: taxonomy artifact when staged, Qdrant facet fallback
 payload indexes: lang and pos keyword indexes in the serving snapshot
 filtered retrieval: Qdrant ACORN, max_selectivity=1.0
 serving memory: scalar int8 quantization with original vectors on disk
@@ -44,9 +44,9 @@ diagnostic override: SEARCH_EXACT_FILTERED=true
 serving collection: scalar int8 quantization, original vectors on disk
 ```
 
-Live evaluation showed that ACORN restored filtered-search quality without
-application-side post-filtering. Scalar int8 quantization preserved manual
-retrieval quality while reducing Qdrant memory enough to test 8 GiB hosts.
+Live evaluation selected ACORN for filtered retrieval quality. Scalar int8
+quantization preserved manual retrieval quality while reducing Qdrant memory
+enough to test 8 GiB hosts.
 
 ## Sizing Direction
 
@@ -66,6 +66,11 @@ The current v3 offline artifact set uses 768-dimensional embeddings and scalar
 int8 quantization before snapshotting. This is the quality target for beta
 serving.
 
+Current Compose files use `qdrant/qdrant:latest`. During the serving review,
+local Docker reported Qdrant 1.17.1 and the Azure beta VM reported Qdrant
+1.18.0. Pin or centralize the Qdrant image only if this drift becomes
+operationally relevant.
+
 ## Operational Checks
 
 ```text
@@ -75,6 +80,7 @@ language and POS filters return expected subsets
 Load more returns the next page
 Qdrant reports payload indexes for lang and pos
 benchmark artifacts upload to logs/web_smoke/<run_id>/
-Redis and Qdrant are bound to localhost/internal Docker networking only
+Qdrant, Redis, and FastAPI remain private to Docker/internal networking
+Nginx binds to localhost on the VM
 Public web access uses Cloudflare Tunnel; Azure does not need inbound 80/443
 ```

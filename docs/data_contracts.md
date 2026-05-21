@@ -1,8 +1,8 @@
 # Serving Artifact Contracts
 
 This repo consumes immutable artifacts produced by
-`github.com/itincknell/Reverse-Wiktionary-Offline`. Blob pointers use small
-`latest.json` files instead of symlinks.
+[Reverse-Wiktionary-Offline](https://github.com/itincknell/Reverse-Wiktionary-Offline).
+Blob pointers use small `latest.json` files instead of symlinks.
 
 ## Blob Storage
 
@@ -117,16 +117,80 @@ The web app downloads `language_taxonomy.json` and `serving_metadata.json` into:
 data/processed/latest/
 ```
 
-`language_taxonomy.json` supplies the browse tree. Qdrant facets remain the
-runtime source of truth for which language labels are present in the collection.
+`language_taxonomy.json` supplies the browse tree and the flat language universe
+used by the web filters. If the taxonomy artifact is absent, the web app falls
+back to a flat language list from Qdrant facets.
+
+Minimal taxonomy shape:
+
+```json
+{
+  "tree": [
+    {
+      "family": "Indo-European",
+      "rows": 123,
+      "branches": [
+        {
+          "branch": "Germanic",
+          "rows": 123,
+          "languages": [
+            {
+              "label": "English",
+              "rows": 123,
+              "selectable": true
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "all_languages": [
+    {
+      "label": "English",
+      "rows": 123,
+      "family": "Indo-European",
+      "branch": "Germanic",
+      "selectable": true
+    }
+  ]
+}
+```
+
+The flat language key may be `all_languages` or `languages`; `all_languages` is
+preferred for current artifacts.
 
 Important behavior:
 
 - The visible tree may omit very small or unresolved families.
-- `all_languages` includes every language label available for filter search
-  and "select all" semantics.
-- If the taxonomy artifact is absent, the web app falls back to a flat language
-  list from Qdrant facets.
+- Selectable `all_languages` records define the search dropdown, "select all"
+  semantics, and submitted language filters.
+- Records with `selectable=false` are retained for review/audit artifacts but
+  are excluded from browse, search, select-all, and submitted filter behavior.
+- Tree-only selectable languages are merged into the flat filter universe.
+
+`serving_metadata.json` supplies lightweight runtime counts for UI filter
+availability. The web app currently reads POS availability from either shape:
+
+```json
+{
+  "pos": [
+    {"pos": "noun", "rows": 2141397},
+    {"pos": "verb", "rows": 531359}
+  ]
+}
+```
+
+```json
+{
+  "pos_counts": {
+    "noun": 2141397,
+    "verb": 531359
+  }
+}
+```
+
+Only positive row counts narrow the visible POS list. If POS metadata is absent
+or empty, the UI falls back to the shared POS allowlist.
 
 ## Web Logs and Benchmarks
 

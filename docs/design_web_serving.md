@@ -1,25 +1,35 @@
 # Web Serving Design
 
 The web service serves natural-language reverse dictionary queries against a
-Qdrant snapshot produced by `github.com/itincknell/Reverse-Wiktionary-Offline`.
+Qdrant snapshot produced by
+[Reverse-Wiktionary-Offline](https://github.com/itincknell/Reverse-Wiktionary-Offline).
 
 ## Architecture
 
-```text
-Azure Blob Qdrant snapshot
-  -> serving VM restore
-  -> Qdrant container
-  -> FastAPI search/web service
-  -> Nginx reverse proxy
-  -> Cloudflare Tunnel
-  -> public UI and stable API
-```
+The serving layer is intentionally narrow. Expensive artifact production happens
+offline; this repo restores those artifacts and serves requests through a
+private-by-default web stack on a single Azure VM.
 
-<img src="assets/deployment-serving-flow.svg" alt="Serving architecture" width="760">
+- Artifact boundary: Azure Blob Storage is the handoff contract from the
+  offline pipeline. The serving inputs are a Qdrant snapshot, taxonomy metadata,
+  serving metadata, and manifests.
+- Runtime boundary: Docker Compose colocates Qdrant, Redis, FastAPI/Uvicorn,
+  and Nginx. Qdrant serves vector retrieval, Redis stores UI session state,
+  FastAPI owns the API/templates, and Nginx is the local HTTP edge.
+- Exposure boundary: Cloudflare Tunnel publishes Nginx only. Qdrant, Redis, and
+  FastAPI are not public surfaces.
+
+<hr width="35%">
+
+<figure>
+  <img src="assets/deployment-serving-flow.svg" alt="Serving architecture" width="100%">
+  <figcaption>Beta serving deployment: immutable artifacts, private runtime services, and a Cloudflare-backed public edge.</figcaption>
+</figure>
 
 This repository does not own preprocessing, embedding generation, taxonomy
-construction, or snapshot creation. It restores or connects to existing serving
-artifacts and handles query traffic.
+construction, or snapshot creation. Those responsibilities stay in the offline
+pipeline. The serving repo restores or connects to existing artifacts and owns
+the request path from query validation through result rendering.
 
 Runtime services run under Docker Compose on a single Azure Linux VM. The
 application container serves both the HTML UI and the stable API through
@@ -28,8 +38,9 @@ short-lived UI session state, Nginx terminates local HTTP for the Compose stack,
 and Cloudflare Tunnel provides the outbound-only public edge.
 
 The serving repo treats the restored Qdrant snapshot and taxonomy metadata as
-immutable deployment inputs. Runtime code is responsible for validation,
-request handling, filtering, rendering, and operational checks.
+immutable deployment inputs. Runtime code is responsible for validation, request
+handling, filtering, rendering, and operational checks; it does not mutate the
+restored collection or rebuild taxonomy.
 
 ## Source Layout
 
@@ -46,13 +57,12 @@ scripts/qdrant/    Serving-side Qdrant verification/tuning helpers.
 
 The production Compose stack is private by default. Qdrant, Redis, and FastAPI
 are reachable only on Docker-internal networking. Nginx binds to
-`127.0.0.1:8080` for local health checks and SSH previews. Public traffic uses
-Cloudflare Tunnel, which makes an outbound connection from the VM and does not
-require inbound VM rules for ports 80 or 443.
+`127.0.0.1:8080` for local health checks and private operator access. Public
+traffic uses Cloudflare Tunnel, which makes an outbound connection from the VM
+and does not require inbound VM rules for ports 80 or 443.
 
 Nginx applies a small request body limit, proxy timeouts, security headers, and
 modest request limiting keyed by `CF-Connecting-IP` when Cloudflare supplies it.
-The Azure NSG allows SSH only from the operator IP during maintenance.
 
 ## Stable API
 
@@ -105,23 +115,19 @@ Response:
 
 Validation:
 
-```text
-query: required, trimmed, bounded string
-langs: optional list; empty means all languages
-pos: optional list; empty means all POS
-limit: default 25, max 100
-offset: default 0, non-negative
-```
+- `query`: required, trimmed, bounded string.
+- `langs`: optional list; empty means all languages.
+- `pos`: optional list; empty means all parts of speech.
+- `limit`: default 25, max 100.
+- `offset`: default 0, non-negative.
 
 Filter semantics:
 
-```text
-multiple languages: OR
-multiple POS values: OR
-language filter AND POS filter
-repeated values are normalized and deduplicated
-no application-side reranking
-```
+- Multiple languages are ORed.
+- Multiple POS values are ORed.
+- Language and POS filter groups are ANDed together.
+- Repeated values are normalized and deduplicated.
+- Results are returned in Qdrant score order without application-side reranking.
 
 ## Web Routes
 
@@ -165,10 +171,8 @@ search service objects. There is no central query queue between web workers and
 Qdrant.
 
 Qdrant searches use configurable query-time `hnsw_ef`. Searches with language
-or POS filters enable Qdrant ACORN traversal with `max_selectivity=1.0`; this
-preserved filtered retrieval quality in live tests without moving filtering or
-reranking into application code. Payload indexes are part of the serving
-snapshot.
+or POS filters enable Qdrant ACORN traversal with `max_selectivity=1.0`.
+Payload indexes are part of the serving snapshot.
 
 For diagnostics, `SEARCH_EXACT_FILTERED=true` switches filtered requests to
 exact Qdrant search.
@@ -176,7 +180,7 @@ exact Qdrant search.
 The web service uses the same embedding model and vector dimension as the
 serving snapshot.
 
-## UI
+## User Interface
 
 UI stack:
 
@@ -200,9 +204,10 @@ expansion display: hidden by default, toggle when present
 ```
 
 The language selector consumes the offline-produced taxonomy artifact when
-available and falls back to the flat Qdrant language facet. The visible browse
-tree may omit low-value singleton family paths; the flat `all_languages` list
-still powers search-only matches, select-all, and submitted filter allowlists.
+available and falls back to a flat Qdrant language facet list when the artifact
+is absent. The visible browse tree may omit low-value singleton family paths;
+the flat `all_languages` list powers search-only matches, select-all, and
+submitted filter allowlists.
 
 Result cards link to English Wiktionary pages. Links are computed locally from
 the lean payload fields `word` and `lang`; the serving path does not call
@@ -305,7 +310,7 @@ logs/web_smoke/<run_id>/web.log
 
 ## Capacity Notes
 
-May 2026 live tests on the 768-dimensional v1 collection showed:
+May 2026 live tests on the 768-dimensional mpnet collection showed:
 
 ```text
 Qdrant version: 1.18.0
@@ -351,9 +356,9 @@ runs/web_serving/20260518-quantized-sizing.md
   "collection": "reverse_wiktionary_v3",
   "model": "loaded",
   "vector_size": 768,
-  "available_langs": 0,
+  "available_langs": 4663,
   "available_pos": 9,
-  "language_taxonomy_families": 0,
+  "language_taxonomy_families": 163,
   "qdrant_hnsw_ef": 512,
   "qdrant_acorn_max_selectivity": 1.0,
   "search_exact_filtered": false

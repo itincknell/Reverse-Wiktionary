@@ -4,28 +4,33 @@ Reverse Wiktionary is a semantic lexical search app. This repository contains
 the online serving layer: FastAPI, Qdrant query integration, Redis-backed UI
 state, Docker/Nginx deployment files, and Azure beta deployment scripts.
 
-Offline artifact production lives in:
+Offline artifact production lives in
+[Reverse-Wiktionary-Offline](https://github.com/itincknell/Reverse-Wiktionary-Offline).
 
-```text
-github.com/itincknell/Reverse-Wiktionary-Offline
-```
+Test coverage and validation harnesses live in
+[Reverse-Wiktionary-Test-Suite](https://github.com/itincknell/Reverse-Wiktionary-Test-Suite).
 
 ## Execution Boundary
 
 ```text
-offline repo:
+Reverse-Wiktionary-Offline
   Wiktionary/Kaikki dump
-  -> normalized rows
-  -> embeddings
-  -> Qdrant collection
-  -> payload indexes and quantization
-  -> deployable Qdrant snapshot + taxonomy artifacts
+    -> normalized lexical rows
+    -> sentence-transformer embeddings
+    -> indexed and quantized Qdrant collection
+    -> deployable artifacts
 
-this repo:
-  deployable snapshot + taxonomy artifacts
-  -> serving VM
-  -> Qdrant + Redis + FastAPI + Nginx
-  -> public search UI/API
+artifact handoff
+  Qdrant snapshot
+  taxonomy files
+  manifest metadata
+
+Reverse-Wiktionary
+  deploy artifacts to serving VM
+    -> Qdrant restores the search index
+    -> FastAPI serves search and templates
+    -> Redis stores lightweight UI state
+    -> Nginx fronts the beta web service
 ```
 
 ## Current Serving Baseline

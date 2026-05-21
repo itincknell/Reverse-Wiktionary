@@ -1,7 +1,10 @@
 # Azure Serving Runbook
 
 This file records serving deployment settings and command shapes. Offline
-embedding runs are documented in `github.com/itincknell/Reverse-Wiktionary-Offline`.
+embedding runs are documented in
+[Reverse-Wiktionary-Offline](https://github.com/itincknell/Reverse-Wiktionary-Offline).
+Commands shown with a VM working directory are intended to run through Azure Run
+Command unless an SSH maintenance path has been explicitly enabled.
 
 ## Shared Azure Settings
 
@@ -56,42 +59,22 @@ az vm create \
   --assign-identity \
   --os-disk-size-gb "$OS_DISK_SIZE_GB" \
   --storage-sku "$STORAGE_SKU" \
-  --public-ip-sku Standard
+  --public-ip-address "" \
+  --nsg-rule NONE
 ```
 
 ## Network Exposure
 
 Public web traffic enters through Cloudflare Tunnel. Qdrant, Redis, FastAPI,
-and Nginx are not exposed directly to the internet.
+and Nginx are not exposed directly to the internet. The beta VM does not need a
+public IP for normal operation.
 
-```bash
-MY_IP="$(curl -fsS https://ifconfig.me)"
-
-NSG_NAME="$(
-  az network nsg list \
-    --resource-group "$RESOURCE_GROUP" \
-    --query "[?contains(name, '$VM_NAME')].name | [0]" \
-    --output tsv
-)"
-
-az network nsg rule update \
-  --resource-group "$RESOURCE_GROUP" \
-  --nsg-name "$NSG_NAME" \
-  --name default-allow-ssh \
-  --source-address-prefixes "$MY_IP/32"
-
-az network nsg rule list \
-  --resource-group "$RESOURCE_GROUP" \
-  --nsg-name "$NSG_NAME" \
-  --query "[].{name:name, access:access, direction:direction, port:destinationPortRange, source:sourceAddressPrefix}" \
-  --output table
-```
-
-Expected public inbound rule:
+Expected inbound posture:
 
 ```text
-SSH from the operator IP only.
 No inbound 80/443 rule.
+No public Qdrant, Redis, or FastAPI listener.
+No SSH rule unless an SSH path is explicitly enabled for maintenance.
 ```
 
 ## Storage Access
@@ -150,9 +133,11 @@ Default VM checkout:
 Patch/update flow on the VM:
 
 ```bash
-cd /opt/reverse-wiktionary/app
-git pull --ff-only origin main
-./scripts/web/restart.sh
+az vm run-command invoke \
+  --resource-group "$RESOURCE_GROUP" \
+  --name "$VM_NAME" \
+  --command-id RunShellScript \
+  --scripts 'cd /opt/reverse-wiktionary/app && git pull --ff-only origin main && ./scripts/web/restart.sh'
 ```
 
 ## Cloudflare Tunnel
@@ -271,19 +256,38 @@ collection.
   --qdrant-hnsw-ef 512
 ```
 
-## SSH Tunnel Preview
+## Operator Inspection
+
+Use Azure Run Command for one-off inspection on the beta VM:
 
 ```bash
-PUBLIC_IP="$(
-  az vm show \
-    --resource-group "$RESOURCE_GROUP" \
-    --name "$VM_NAME" \
-    --show-details \
-    --query publicIps \
-    --output tsv
-)"
+az vm run-command invoke \
+  --resource-group "$RESOURCE_GROUP" \
+  --name "$VM_NAME" \
+  --command-id RunShellScript \
+  --scripts 'cd /opt/reverse-wiktionary/app && ./scripts/web/status.sh'
+```
 
-ssh -N -L 18000:127.0.0.1:8080 "$ADMIN_USER@$PUBLIC_IP"
+For local-only HTTP checks from the VM:
+
+```bash
+az vm run-command invoke \
+  --resource-group "$RESOURCE_GROUP" \
+  --name "$VM_NAME" \
+  --command-id RunShellScript \
+  --scripts 'curl -fsS http://127.0.0.1:8080/health'
+```
+
+## Conditional SSH Tunnel Preview
+
+SSH preview is not the default beta access path. Use it only when the VM has an
+explicitly enabled SSH route such as Bastion, VPN, or a temporary approved
+access change.
+
+```bash
+SSH_HOST="<ssh-reachable-host>"
+
+ssh -N -L 18000:127.0.0.1:8080 "$ADMIN_USER@$SSH_HOST"
 ```
 
 Preview:
@@ -300,5 +304,5 @@ az vm deallocate \
   --name "$VM_NAME"
 ```
 
-`deallocate` stops compute billing. The OS disk and public IP continue to incur
-small storage/network charges until deleted.
+`deallocate` stops compute billing. The OS disk continues to incur storage
+charges until deleted.

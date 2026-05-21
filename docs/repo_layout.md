@@ -2,11 +2,12 @@
 
 This repository contains the online serving and deployment code for Reverse
 Wiktionary. Offline parsing, embedding generation, taxonomy construction, and
-Qdrant snapshot creation live in:
+Qdrant snapshot creation live in
+[Reverse-Wiktionary-Offline](https://github.com/itincknell/Reverse-Wiktionary-Offline).
 
-```text
-github.com/itincknell/Reverse-Wiktionary-Offline
-```
+Test coverage and validation harnesses live in
+[Reverse-Wiktionary-Test-Suite](https://github.com/itincknell/Reverse-Wiktionary-Test-Suite).
+Any local `tests/` directory in this repo is staging-only and ignored by git.
 
 ## Layout
 
