@@ -19,12 +19,13 @@ private-by-default web stack on a single Azure VM.
 - Exposure boundary: Cloudflare Tunnel publishes Nginx only. Qdrant, Redis, and
   FastAPI are not public surfaces.
 
-<hr width="35%">
+<p align="center">――――――――――</p>
 
-<figure>
+<p align="center">
   <img src="assets/deployment-serving-flow.svg" alt="Serving architecture" width="100%">
-  <figcaption>Beta serving deployment: immutable artifacts, private runtime services, and a Cloudflare-backed public edge.</figcaption>
-</figure>
+</p>
+
+<p align="center"><em>Beta serving deployment: immutable artifacts, private runtime services, and a Cloudflare-backed public edge.</em></p>
 
 This repository does not own preprocessing, embedding generation, taxonomy
 construction, or snapshot creation. Those responsibilities stay in the offline
