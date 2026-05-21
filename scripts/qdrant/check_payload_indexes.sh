@@ -7,7 +7,15 @@ QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
 COLLECTION_NAME=""
 
 usage() {
-  sed -n '3,33p' "$0"
+  cat <<'EOF'
+Usage: check_payload_indexes.sh --collection-name NAME [--qdrant-url URL]
+
+Verifies the serving payload indexes on lang and pos.
+
+Options:
+  --collection-name NAME  Required Qdrant collection name.
+  --qdrant-url URL       Default: http://localhost:6333
+EOF
 }
 
 while [ "$#" -gt 0 ]; do
@@ -53,4 +61,3 @@ for field_name in lang pos; do
 
   echo "payload index verified: $field_name"
 done
-

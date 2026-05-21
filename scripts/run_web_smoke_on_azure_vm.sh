@@ -37,7 +37,7 @@ Optional:
   --vm-repo-dir PATH
       Defaults to /opt/reverse-wiktionary-web-smoke.
   --qdrant-hnsw-ef N
-      Query-time HNSW exploration parameter. Defaults to 64 for beta sizing.
+      Query-time HNSW exploration parameter. Defaults to 512.
   --qdrant-acorn-max-selectivity N
       ACORN selectivity threshold for filtered searches. Defaults to 1.0.
   --search-exact-filtered
