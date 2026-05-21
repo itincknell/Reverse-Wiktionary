@@ -687,10 +687,6 @@ details summary {
     max-height: 148px;
   }
 
-  .filter-panel:has([data-language-search])[open] + .filter-panel {
-    margin-top: 6px;
-  }
-
   .filter-panel:last-of-type {
     margin-bottom: 8px;
   }
