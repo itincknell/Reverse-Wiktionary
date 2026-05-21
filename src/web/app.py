@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from time import perf_counter
 
@@ -14,10 +16,10 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from src.common.lexical_schema import ALLOWED_POS
+from src.common.pos import ALLOWED_POS
 from src.search.encoder import QueryEncoder, QueryEncoderConfig
 from src.search.qdrant_search import QdrantSearchClient, QdrantSearchConfig
-from src.search.schemas import SearchRequest
+from src.search.schemas import SearchRequest, SearchResponse
 from src.search.service import SearchService
 from src.web.config import WebSettings, load_settings
 from src.web.state import SESSION_COOKIE, ClientSearchState, RedisSessionStore
@@ -39,24 +41,8 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
     settings = settings or load_settings()
     _configure_logging(settings.log_level)
 
-    app = FastAPI(title="Reverse Wiktionary", version="1.0.0")
-    app.state.settings = settings
-    app.state.available_langs = []
-    app.state.available_pos = list(ALLOWED_POS)
-    app.state.language_taxonomy = {"families": []}
-
-    templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
-    templates.env.globals["asset_version"] = settings.asset_version
-    app.state.templates = templates
-
-    app.mount(
-        "/static",
-        StaticFiles(directory=str(PACKAGE_DIR / "static")),
-        name="static",
-    )
-
-    @app.on_event("startup")
-    def startup() -> None:
+    @asynccontextmanager
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         """
         Initialize worker-local model/search clients and shared Redis state.
         """
@@ -92,6 +78,24 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             fallback_languages=app.state.available_langs,
         )
         app.state.available_pos = available_pos_from_metadata(settings.serving_metadata_path)
+
+        yield
+
+    app = FastAPI(title="Reverse Wiktionary", version="1.0.0", lifespan=lifespan)
+    app.state.settings = settings
+    app.state.available_langs = []
+    app.state.available_pos = list(ALLOWED_POS)
+    app.state.language_taxonomy = {"families": []}
+
+    templates = Jinja2Templates(directory=str(PACKAGE_DIR / "templates"))
+    templates.env.globals["asset_version"] = settings.asset_version
+    app.state.templates = templates
+
+    app.mount(
+        "/static",
+        StaticFiles(directory=str(PACKAGE_DIR / "static")),
+        name="static",
+    )
 
     @app.get("/health")
     def health() -> dict[str, object]:
@@ -378,7 +382,7 @@ def _configure_logging(log_level: str) -> None:
 def _log_search(
     *,
     route: str,
-    search_response: object,
+    search_response: SearchResponse,
     route_total_ms: float,
 ) -> None:
     """

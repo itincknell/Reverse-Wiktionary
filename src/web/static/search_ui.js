@@ -8,6 +8,7 @@
     const panels = Array.from(document.querySelectorAll("[data-mobile-collapsible]"));
 
     function syncPanels() {
+      // Mobile starts with compact panels; desktop keeps the filter controls visible.
       panels.forEach((panel) => {
         if (media.matches) {
           if (panel.hasAttribute("data-mobile-default-open")) {
@@ -56,33 +57,27 @@
   function initializeResultScrolling() {
     const media = window.matchMedia(MOBILE_QUERY);
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let pendingScrollMode = null;
+    let shouldScrollToResults = false;
 
     document.body.addEventListener("htmx:beforeRequest", (event) => {
       if (!media.matches) {
-        pendingScrollMode = null;
+        shouldScrollToResults = false;
         return;
       }
 
       const trigger = event.detail.elt;
-      if (trigger?.matches("[data-search-form]")) {
-        pendingScrollMode = "first";
-      } else if (trigger?.classList.contains("load-more")) {
-        pendingScrollMode = "latest";
-      }
+      // New searches reveal the refreshed result set; load-more keeps the reader's place.
+      shouldScrollToResults = Boolean(trigger?.matches("[data-search-form]"));
     });
 
     document.body.addEventListener("htmx:afterSwap", () => {
-      if (!pendingScrollMode || !media.matches) {
-        pendingScrollMode = null;
+      if (!shouldScrollToResults || !media.matches) {
+        shouldScrollToResults = false;
         return;
       }
 
-      const selector = pendingScrollMode === "latest"
-        ? ".result-list:last-of-type .result-card"
-        : "#results .result-card";
-      const target = document.querySelector(selector);
-      pendingScrollMode = null;
+      shouldScrollToResults = false;
+      const target = document.querySelector("#results .result-card");
 
       if (target) {
         target.scrollIntoView({

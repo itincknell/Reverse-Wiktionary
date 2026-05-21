@@ -1,4 +1,4 @@
-"""Part-of-speech vocabulary accepted by the public search API."""
+"""Part-of-speech values supported by search filters."""
 
 ALLOWED_POS = (
     "noun",

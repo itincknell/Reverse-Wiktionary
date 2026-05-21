@@ -54,7 +54,7 @@ def _bool_env(name: str, default: bool = False) -> bool:
     value = os.getenv(name)
     if value is None:
         return default
-    return value.lower() in {"1", "true", "yes"}
+    return value.strip().lower() in {"1", "true", "yes"}
 
 
 def load_settings() -> WebSettings:

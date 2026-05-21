@@ -75,7 +75,7 @@ Required fields:
 
 - `word`: display headword.
 - `lang`: language label used for filtering.
-- `pos`: part of speech compatible with `src/common/lexical_schema.py`.
+- `pos`: part of speech compatible with `src/common/pos.py`.
 - `glosses`: ordered list of display glosses.
 
 Optional fields:

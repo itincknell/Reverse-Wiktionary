@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field, field_validator
 
-from src.common.lexical_schema import ALLOWED_POS
+from src.common.pos import ALLOWED_POS
 
 
 DEFAULT_LIMIT = 25
@@ -70,7 +70,10 @@ class SearchRequest(BaseModel):
     @field_validator("query")
     @classmethod
     def clean_query(cls, value: str) -> str:
-        return " ".join(value.strip().split())
+        cleaned = " ".join(value.strip().split())
+        if not cleaned:
+            raise ValueError("Query must contain non-whitespace text")
+        return cleaned
 
     @field_validator("langs", "pos")
     @classmethod

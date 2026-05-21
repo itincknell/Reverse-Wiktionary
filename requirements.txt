@@ -1,9 +1,4 @@
-# Direct runtime dependencies for the Reverse Wiktionary serving app.
-#
-# This is intentionally not a local pip freeze. The Azure VM runs Python 3.10,
-# while local development environments may resolve newer transitive packages
-# that are not installable on the VM. Offline indexing dependencies live in
-# github.com/itincknell/Reverse-Wiktionary-Offline.
+# Direct runtime dependencies for the serving app.
 numpy
 fastapi
 jinja2

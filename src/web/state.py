@@ -72,15 +72,7 @@ class RedisSessionStore:
 
         if raw is not None:
             data = json.loads(raw)
-            state = ClientSearchState(
-                selected_langs=list(data.get("selected_langs", [])),
-                selected_pos=list(data.get("selected_pos", [])),
-                latest_query=data.get("latest_query"),
-                limit=int(data.get("limit", default_limit)),
-                next_offset=int(data.get("next_offset", 0)),
-                created_at_utc=str(data.get("created_at_utc") or utc_now_iso()),
-                updated_at_utc=str(data.get("updated_at_utc") or utc_now_iso()),
-            )
+            state = _session_state_from_json(data)
             self.save(session_id, state)
             return state
 
@@ -107,3 +99,37 @@ class RedisSessionStore:
             self.ttl_seconds,
             json.dumps(asdict(state), ensure_ascii=False),
         )
+
+
+def _session_state_from_json(data: object) -> ClientSearchState:
+    """
+    Build a session state from Redis JSON, rejecting contract drift.
+    """
+    if not isinstance(data, dict):
+        raise ValueError("Invalid session state: expected JSON object")
+
+    try:
+        state = ClientSearchState(**data)
+    except TypeError as exc:
+        raise ValueError("Invalid session state fields") from exc
+
+    # Use exact int checks so JSON booleans are not accepted as offsets/limits.
+    if (
+        not _is_string_list(state.selected_langs)
+        or not _is_string_list(state.selected_pos)
+        or (state.latest_query is not None and not isinstance(state.latest_query, str))
+        or type(state.limit) is not int
+        or type(state.next_offset) is not int
+        or not isinstance(state.created_at_utc, str)
+        or not isinstance(state.updated_at_utc, str)
+    ):
+        raise ValueError("Invalid session state fields")
+
+    return state
+
+
+def _is_string_list(value: object) -> bool:
+    """
+    Return whether value is a JSON-style list of strings.
+    """
+    return isinstance(value, list) and all(isinstance(item, str) for item in value)
