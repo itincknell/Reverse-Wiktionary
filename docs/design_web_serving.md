@@ -19,7 +19,7 @@ private-by-default web stack on a single Azure VM.
 - Exposure boundary: Cloudflare Tunnel publishes Nginx only. Qdrant, Redis, and
   FastAPI are not public surfaces.
 
-<p align="center">――――――――――</p>
+<p>&nbsp;</p>
 
 <p align="center">
   <img src="assets/deployment-serving-flow.svg" alt="Serving architecture" width="100%">
