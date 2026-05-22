@@ -338,13 +338,6 @@ The current v3 artifact set uses 768-dimensional vectors with scalar int8
 quantization before snapshotting. A 512-dimensional beta artifact reduced
 memory pressure but did not meet filtered retrieval quality requirements.
 
-Committed run summaries:
-
-```text
-runs/web_serving/20260518-acorn-sizing.md
-runs/web_serving/20260518-quantized-sizing.md
-```
-
 ## Health Checks
 
 `GET /health` reports:

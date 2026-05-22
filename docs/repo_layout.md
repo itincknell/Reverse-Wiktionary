@@ -22,7 +22,6 @@ scripts/web/      Local/prod serving operations, image archives, smoke checks,
 scripts/azure/    Azure VM bootstrap and remote web smoke entrypoints.
 scripts/qdrant/   Serving-side Qdrant verification/tuning helpers.
 docs/             Serving architecture, artifact contracts, runbooks.
-runs/web_serving/ Committed benchmark/sizing notes.
 ```
 
 ## Boundary
