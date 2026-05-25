@@ -38,6 +38,10 @@ services:
       MAX_LIMIT: ${MAX_LIMIT:-100}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-86400}
       SECURE_COOKIES: "true"
+      AUDIO_FETCH_CONNECT_TIMEOUT_SECONDS: ${AUDIO_FETCH_CONNECT_TIMEOUT_SECONDS:-2}
+      AUDIO_FETCH_READ_TIMEOUT_SECONDS: ${AUDIO_FETCH_READ_TIMEOUT_SECONDS:-8}
+      AUDIO_FETCH_MAX_BYTES: ${AUDIO_FETCH_MAX_BYTES:-5242880}
+      AUDIO_FETCH_USER_AGENT: "${AUDIO_FETCH_USER_AGENT:-Reverse-Wiktionary/1.0 (https://reverse-wiktionary.com)}"
     volumes:
       - ${REVERSE_WIKTIONARY_DATA_ROOT:-/opt/reverse-wiktionary/data}/processed/latest:/app/data/processed/latest:ro
     expose:
@@ -54,6 +58,7 @@ services:
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ${REVERSE_WIKTIONARY_DATA_ROOT:-/opt/reverse-wiktionary/data}/logs/nginx:/var/log/nginx
+      - ${REVERSE_WIKTIONARY_DATA_ROOT:-/opt/reverse-wiktionary/data}/audio-cache/nginx:/var/cache/nginx/audio
     depends_on:
       - web
     restart: unless-stopped

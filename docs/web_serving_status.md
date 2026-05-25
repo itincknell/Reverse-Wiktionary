@@ -14,6 +14,7 @@ session state: Redis with TTL
 pagination: Load more button
 language source: taxonomy artifact when staged, Qdrant facet fallback
 payload indexes: lang and pos keyword indexes in the serving snapshot
+pronunciation fields: optional IPA and Wikimedia audio URLs in v6 payloads
 filtered retrieval: Qdrant ACORN, max_selectivity=1.0
 serving memory: scalar int8 quantization with original vectors on disk
 storage root: /opt/reverse-wiktionary/data
@@ -34,6 +35,8 @@ public edge: Cloudflare Tunnel in front of Nginx
   headers, and modest per-IP request limiting.
 - Production Compose config with Docker-internal Qdrant/Redis/FastAPI,
   localhost-only Nginx, and optional Cloudflare Tunnel profile.
+- Optional pronunciation display fields in search results, with lazy audio
+  playback through a validated FastAPI endpoint and Nginx-managed cache.
 
 ## Retrieval Policy
 
@@ -80,6 +83,8 @@ language and POS filters return expected subsets
 Load more returns the next page
 Qdrant reports payload indexes for lang and pos
 benchmark artifacts upload to logs/web_smoke/<run_id>/
+pronunciation audio is not requested until a user clicks playback
+audio-cache accepts only Wikimedia upload URLs
 Qdrant, Redis, and FastAPI remain private to Docker/internal networking
 Nginx binds to localhost on the VM
 Public web access uses Cloudflare Tunnel; Azure does not need inbound 80/443

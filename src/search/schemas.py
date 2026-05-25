@@ -113,6 +113,9 @@ class SearchResult(BaseModel):
     score: float
     glosses: list[str]
     expansion: str | None = None
+    ipa: str | None = None
+    audio_ogg_url: str | None = None
+    audio_mp3_url: str | None = None
     wiktionary_url: str
 
 

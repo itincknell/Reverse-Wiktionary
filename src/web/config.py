@@ -34,6 +34,10 @@ class WebSettings:
     language_taxonomy_path: str
     serving_metadata_path: str
     asset_version: str
+    audio_fetch_user_agent: str
+    audio_fetch_connect_timeout_seconds: float
+    audio_fetch_read_timeout_seconds: float
+    audio_fetch_max_bytes: int
 
 
 def _int_env(name: str, default: int) -> int:
@@ -88,4 +92,17 @@ def load_settings() -> WebSettings:
             "data/processed/latest/serving_metadata.json",
         ),
         asset_version=os.getenv("ASSET_VERSION", "dev"),
+        audio_fetch_user_agent=os.getenv(
+            "AUDIO_FETCH_USER_AGENT",
+            "Reverse-Wiktionary/1.0 (https://reverse-wiktionary.com)",
+        ),
+        audio_fetch_connect_timeout_seconds=_float_env(
+            "AUDIO_FETCH_CONNECT_TIMEOUT_SECONDS",
+            2.0,
+        ),
+        audio_fetch_read_timeout_seconds=_float_env(
+            "AUDIO_FETCH_READ_TIMEOUT_SECONDS",
+            8.0,
+        ),
+        audio_fetch_max_bytes=_int_env("AUDIO_FETCH_MAX_BYTES", 5 * 1024 * 1024),
     )

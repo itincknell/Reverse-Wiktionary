@@ -1,11 +1,38 @@
 <article class="result-card">
   <header class="result-header">
     <div>
-      <h2>
-        <a href="{{ result.wiktionary_url }}" target="_blank" rel="noopener noreferrer">
-          {{ result.word }}
-        </a>
-      </h2>
+      {% set audio_url = result.audio_mp3_url or result.audio_ogg_url %}
+      <div class="result-title-row">
+        <h2>
+          <a href="{{ result.wiktionary_url }}" target="_blank" rel="noopener noreferrer">
+            {{ result.word }}
+          </a>
+        </h2>
+
+        {% if result.ipa or audio_url %}
+          <div class="pronunciation">
+            {% if result.ipa %}
+              <span class="ipa">{{ result.ipa }}</span>
+            {% endif %}
+            {% if audio_url %}
+              <button
+                type="button"
+                class="audio-button"
+                data-audio-url="{{ audio_url }}"
+                data-audio-word="{{ result.word }}"
+                data-audio-state="idle"
+                aria-label="Play pronunciation for {{ result.word }}"
+              >
+                <svg class="audio-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 9v6h4l5 4V5L8 9H4z"></path>
+                  <path d="M16 8.5a5 5 0 0 1 0 7"></path>
+                  <path d="M18.5 6a8.5 8.5 0 0 1 0 12"></path>
+                </svg>
+              </button>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
       <div class="metadata">{{ result.pos }}, {{ result.lang }}</div>
     </div>
 

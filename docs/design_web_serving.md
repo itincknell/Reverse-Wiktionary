@@ -108,6 +108,9 @@ Response:
       "score": 0.82,
       "glosses": ["A reference work listing words..."],
       "expansion": null,
+      "ipa": "/ˈdɪk.ʃə.nə.ɹi/",
+      "audio_ogg_url": "https://upload.wikimedia.org/wikipedia/commons/example.ogg",
+      "audio_mp3_url": "https://upload.wikimedia.org/wikipedia/commons/transcoded/example.ogg/example.ogg.mp3",
       "wiktionary_url": "https://en.wiktionary.org/wiki/dictionary#English"
     }
   ]
@@ -137,11 +140,14 @@ GET  /
 GET  /about
 POST /ui/search
 POST /ui/search/more
+GET  /api/audio-cache
 GET  /health
 ```
 
 `/ui/*` routes are implementation routes for the HTMX/Jinja UI. The stable
 programmatic contract is `/api/v1/search`.
+`/api/audio-cache` validates and fetches pronunciation audio for browser and
+Nginx caching; it is not a general-purpose proxy.
 
 ## Query Path
 
@@ -202,6 +208,7 @@ search execution: explicit Search button only
 pagination: Load more button
 gloss display: first three glosses, show-more toggle for the rest
 expansion display: hidden by default, toggle when present
+pronunciation display: IPA text when present, lazy audio button when available
 ```
 
 The language selector consumes the offline-produced taxonomy artifact when
@@ -213,6 +220,11 @@ submitted filter allowlists.
 Result cards link to English Wiktionary pages. Links are computed locally from
 the lean payload fields `word` and `lang`; the serving path does not call
 Wiktionary or store duplicate URL fields in Qdrant.
+
+Pronunciation metadata is optional display data from the serving payload. IPA
+text renders directly on result cards. Audio buttons create browser audio only
+after the first click and request the app audio-cache endpoint, which validates
+Wikimedia upload URLs before Nginx caches successful responses.
 
 ## Session State
 
@@ -272,6 +284,7 @@ Production host paths:
 /opt/reverse-wiktionary/data/qdrant/storage
 /opt/reverse-wiktionary/data/redis/data
 /opt/reverse-wiktionary/data/logs
+/opt/reverse-wiktionary/data/audio-cache/nginx
 /opt/reverse-wiktionary/data/snapshots
 /opt/reverse-wiktionary/data/restore
 ```
@@ -292,6 +305,10 @@ delete downloaded snapshot when restore is complete
 start web service
 verify /health
 ```
+
+Pronunciation audio is not part of the restore flow. Result payloads contain
+optional source URLs; audio bytes are fetched lazily at playback time and cached
+by Nginx.
 
 ## Operational Validation
 

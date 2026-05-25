@@ -11,8 +11,8 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from time import perf_counter
 
-from fastapi import FastAPI, Form, Request, Response
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, Form, HTTPException, Query, Request, Response
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -21,6 +21,7 @@ from src.search.encoder import QueryEncoder, QueryEncoderConfig
 from src.search.qdrant_search import QdrantSearchClient, QdrantSearchConfig
 from src.search.schemas import SearchRequest, SearchResponse
 from src.search.service import SearchService
+from src.web.audio_cache import AudioFetchConfig, AudioFetchError, fetch_wikimedia_audio
 from src.web.config import WebSettings, load_settings
 from src.web.state import SESSION_COOKIE, ClientSearchState, RedisSessionStore
 from src.web.taxonomy import load_language_taxonomy
@@ -135,6 +136,36 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             request=request,
             name="about.html",
             context={"request": request},
+        )
+
+    @app.get("/api/audio-cache")
+    def audio_cache(url: str = Query(..., min_length=1)) -> StreamingResponse:
+        """
+        Fetch allowlisted pronunciation audio for browser/Nginx caching.
+        """
+        try:
+            audio = fetch_wikimedia_audio(
+                url,
+                AudioFetchConfig(
+                    user_agent=settings.audio_fetch_user_agent,
+                    connect_timeout_seconds=settings.audio_fetch_connect_timeout_seconds,
+                    read_timeout_seconds=settings.audio_fetch_read_timeout_seconds,
+                    max_bytes=settings.audio_fetch_max_bytes,
+                ),
+            )
+        except AudioFetchError as exc:
+            raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
+
+        headers = {
+            "Cache-Control": "public, max-age=31536000, immutable",
+        }
+        if audio.content_length is not None:
+            headers["Content-Length"] = str(audio.content_length)
+
+        return StreamingResponse(
+            audio.chunks,
+            media_type=audio.media_type,
+            headers=headers,
         )
 
     @app.post("/api/v1/search")

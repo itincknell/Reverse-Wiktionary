@@ -152,10 +152,24 @@ class QdrantSearchClient:
             pos=str(payload.get("pos") or ""),
             score=float(point.score),
             glosses=[str(gloss) for gloss in glosses if isinstance(gloss, str)],
-            expansion=(
-                str(payload["expansion"])
-                if payload.get("expansion") is not None
-                else None
-            ),
+            expansion=_optional_payload_string(payload, "expansion"),
+            ipa=_optional_payload_string(payload, "ipa"),
+            audio_ogg_url=_optional_payload_string(payload, "audio_ogg_url"),
+            audio_mp3_url=_optional_payload_string(payload, "audio_mp3_url"),
             wiktionary_url=wiktionary_url(word, lang),
         )
+
+
+def _optional_payload_string(payload: dict[str, Any], key: str) -> str | None:
+    """
+    Return a non-empty display string from an optional Qdrant payload field.
+    """
+    value = payload.get(key)
+    if not isinstance(value, str):
+        return None
+
+    value = value.strip()
+    if not value:
+        return None
+
+    return value

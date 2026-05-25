@@ -57,7 +57,8 @@ uses the restored collection as serving truth.
 
 ## Search Payload
 
-Each Qdrant point exposes the fields used by the API/UI:
+Each Qdrant point exposes the fields used by the API/UI. The current processed
+row schema is `v6`:
 
 ```json
 {
@@ -67,7 +68,10 @@ Each Qdrant point exposes the fields used by the API/UI:
   "glosses": [
     "The distinctive scent which accompanies the first rain after a dry spell."
   ],
-  "expansion": null
+  "expansion": null,
+  "ipa": "/ˈpɛt.rɪ.kɔːr/",
+  "audio_ogg_url": "https://upload.wikimedia.org/wikipedia/commons/example.ogg",
+  "audio_mp3_url": "https://upload.wikimedia.org/wikipedia/commons/transcoded/example.ogg/example.ogg.mp3"
 }
 ```
 
@@ -81,6 +85,9 @@ Required fields:
 Optional fields:
 
 - `expansion`: Wiktionary head-template expansion when available.
+- `ipa`: first non-empty IPA value from the raw Wiktextract `sounds` list.
+- `audio_ogg_url`: first non-empty Ogg audio URL from the raw `sounds` list.
+- `audio_mp3_url`: first non-empty MP3 audio URL from the raw `sounds` list.
 
 URL contract:
 
@@ -96,6 +103,15 @@ café / French -> https://en.wiktionary.org/wiki/caf%C3%A9#French
 duo / Norwegian Bokmål -> https://en.wiktionary.org/wiki/duo#Norwegian_Bokm%C3%A5l
 褂 / Chinese -> https://en.wiktionary.org/wiki/%E8%A4%82#Chinese
 ```
+
+Pronunciation audio contract:
+
+- Audio payload fields store source URLs only, not audio bytes.
+- The serving app accepts only HTTPS URLs on `upload.wikimedia.org`.
+- Browser playback uses the app audio endpoint so Nginx can cache successful
+  responses.
+- Pronunciation fields are display metadata and are not included in
+  `embedding_text`.
 
 ## Language Taxonomy Artifact
 

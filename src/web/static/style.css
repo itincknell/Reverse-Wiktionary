@@ -491,6 +491,13 @@ textarea:focus,
   line-height: 1.2;
 }
 
+.result-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+
 .result-header h2 a {
   color: var(--accent-dark);
   text-decoration: none;
@@ -506,6 +513,57 @@ textarea:focus,
   margin-top: 3px;
   color: var(--muted);
   font-size: 14px;
+}
+
+.pronunciation {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding-left: 12px;
+}
+
+.ipa {
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.audio-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: var(--accent-dark);
+  background: var(--panel);
+  cursor: pointer;
+}
+
+.audio-button:hover {
+  border-color: var(--accent);
+}
+
+.audio-button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.audio-button:disabled {
+  color: var(--muted);
+  cursor: progress;
+}
+
+.audio-icon {
+  width: 16px;
+  height: 16px;
+  display: block;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
 }
 
 .gloss-list {

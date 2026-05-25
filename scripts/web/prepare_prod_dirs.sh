@@ -25,6 +25,7 @@ mkdir -p "$APP_DIR"
 mkdir -p "$ROOT/qdrant/storage"
 mkdir -p "$ROOT/redis/data"
 mkdir -p "$ROOT/logs/nginx"
+mkdir -p "$ROOT/audio-cache/nginx"
 mkdir -p "$ROOT/snapshots"
 
 echo "app dir: $APP_DIR"
