@@ -33,6 +33,14 @@
 >
   <summary class="filter-panel-summary">
     <span class="section-heading">Languages</span>
+    <button
+      class="link-button language-view-toggle"
+      type="button"
+      data-language-view-toggle
+      aria-label="Show flat language list"
+    >
+      List
+    </button>
   </summary>
   <div class="filter-panel-body">
     <div class="language-search-box">
@@ -49,6 +57,11 @@
       ></div>
     </div>
     <div data-language-inputs></div>
+    <div
+      class="filter-options tall language-flat-list"
+      data-language-flat-list
+      hidden
+    ></div>
     <div
       id="language-options"
       class="filter-options tall taxonomy-tree"

@@ -1,0 +1,25 @@
+[package]
+name = "ipa-to-mespeak"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "ipa_to_mespeak"
+path = "rust/src/lib.rs"
+crate-type = ["cdylib", "rlib"]
+
+[[bin]]
+name = "ipa-to-mespeak"
+path = "rust/src/main.rs"
+
+[dependencies]
+pyo3 = { version = "0.26" }
+
+[features]
+default = []
+extension-module = ["pyo3/extension-module"]
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

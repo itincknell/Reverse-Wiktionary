@@ -54,6 +54,15 @@ scripts/azure/     VM bootstrap and remote web smoke entrypoints.
 scripts/qdrant/    Serving-side Qdrant verification/tuning helpers.
 ```
 
+## Local Preview
+
+The checked-in local preview stack uses the staged
+`reverse_wiktionary_test` Qdrant collection. That collection is a compact
+384-dimensional test fixture, so `deploy/web/compose.local.yml` and
+`scripts/web/run_local_web.sh` default to
+`sentence-transformers/all-MiniLM-L6-v2`. Production remains configured for the
+768-dimensional mpnet artifact set unless explicitly overridden.
+
 ## Network Boundary
 
 The production Compose stack is private by default. Qdrant, Redis, and FastAPI
@@ -141,6 +150,10 @@ GET  /about
 POST /ui/search
 POST /ui/search/more
 GET  /api/audio-cache
+GET  /api/ipa-pronunciation
+GET  /api/pronunciation-assets/mespeak.js
+GET  /api/pronunciation-assets/config
+GET  /api/pronunciation-assets/voices/{voice}
 GET  /health
 ```
 
@@ -148,6 +161,11 @@ GET  /health
 programmatic contract is `/api/v1/search`.
 `/api/audio-cache` validates and fetches pronunciation audio for browser and
 Nginx caching; it is not a general-purpose proxy.
+`/api/ipa-pronunciation` returns the cacheable native IPA-to-meSpeak phoneme
+payload for a single supported IPA string and voice.
+`/api/pronunciation-assets/*` serves allowlisted local meSpeak runtime assets
+with long-lived cache headers; the browser does not load pronunciation runtime
+code or voice JSON from a public CDN.
 
 ## Query Path
 
@@ -208,7 +226,8 @@ search execution: explicit Search button only
 pagination: Load more button
 gloss display: first three glosses, show-more toggle for the rest
 expansion display: hidden by default, toggle when present
-pronunciation display: IPA text when present, lazy audio button when available
+pronunciation display: IPA text when present, auto-pronunciation button when
+  IPA parsing succeeds, recording button otherwise when audio is available
 ```
 
 The language selector consumes the offline-produced taxonomy artifact when
@@ -222,9 +241,15 @@ the lean payload fields `word` and `lang`; the serving path does not call
 Wiktionary or store duplicate URL fields in Qdrant.
 
 Pronunciation metadata is optional display data from the serving payload. IPA
-text renders directly on result cards. Audio buttons create browser audio only
-after the first click and request the app audio-cache endpoint, which validates
-Wikimedia upload URLs before Nginx caches successful responses.
+text renders directly on result cards. When IPA parsing succeeds, the UI shows
+an automatic-pronunciation button and fetches the parsed meSpeak phoneme payload
+only after the first click. That click also lazy-loads the local meSpeak browser
+runtime, the runtime config, and the canonical voice JSON needed for the row,
+then plays the bracketed meSpeak phoneme input in the browser. When IPA parsing
+is unavailable and a Wikimedia recording URL exists, the UI shows the recording
+button; that path creates browser audio only after the first click and requests
+the app audio-cache endpoint, which validates Wikimedia upload URLs before
+Nginx caches successful responses.
 
 ## Session State
 
@@ -265,8 +290,9 @@ OS disk for durable Qdrant storage
 ```
 
 The web image can be built once and loaded from a Docker archive on small beta
-hosts. This keeps the PyTorch/model dependency build off the deployment VM while
-still allowing Git-based source control for configuration and templates.
+hosts. It includes the Python runtime dependencies and default query-model
+cache, keeping that setup work off the deployment VM while still allowing
+Git-based source control for configuration and templates.
 
 Initial FastAPI worker count:
 
@@ -285,6 +311,7 @@ Production host paths:
 /opt/reverse-wiktionary/data/redis/data
 /opt/reverse-wiktionary/data/logs
 /opt/reverse-wiktionary/data/audio-cache/nginx
+/opt/reverse-wiktionary/data/pronunciation-cache/nginx
 /opt/reverse-wiktionary/data/snapshots
 /opt/reverse-wiktionary/data/restore
 ```

@@ -112,6 +112,14 @@ Pronunciation audio contract:
   responses.
 - Pronunciation fields are display metadata and are not included in
   `embedding_text`.
+- The serving app may derive an `auto_pronunciation` UI field from `ipa` when
+  the native IPA-to-meSpeak transducer supports the language and IPA string.
+  This derived field is not stored in Qdrant.
+- `/api/ipa-pronunciation` returns a cacheable JSON phoneme payload for one
+  supported voice and IPA string. It also returns the browser playback voice id.
+  It does not return audio bytes.
+- `/api/pronunciation-assets/*` serves the local meSpeak runtime, config, and
+  allowlisted voice JSON assets used by automatic pronunciation playback.
 
 ## Language Taxonomy Artifact
 

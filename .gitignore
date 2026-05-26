@@ -24,6 +24,9 @@ data/
 /tmp/
 /tree/
 
+# Local subrepos
+ipa-to-mespeak/
+
 # Local test-suite workspace
 tests/
 

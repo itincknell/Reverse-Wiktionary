@@ -8,6 +8,7 @@ set -euo pipefail
 IMAGE_NAME="${WEB_IMAGE_NAME:-reverse-wiktionary-web}"
 TAG="${WEB_IMAGE_TAG:-}"
 OUTPUT_DIR="${WEB_IMAGE_ARCHIVE_DIR:-data/docker-images}"
+PLATFORM="${WEB_IMAGE_PLATFORM:-linux/amd64}"
 UPLOAD="false"
 STORAGE_ACCOUNT=""
 CONTAINER=""
@@ -25,6 +26,8 @@ Options:
       Docker image tag. Defaults to the current Git short SHA.
   --output-dir PATH
       Directory for the archive and manifest. Defaults to data/docker-images.
+  --platform PLATFORM
+      Docker target platform. Defaults to linux/amd64.
   --upload
       Upload archive and manifest to Azure Blob Storage.
   --storage-account NAME
@@ -33,6 +36,12 @@ Options:
       Azure Blob container used with --upload.
   --blob-prefix PATH
       Blob prefix used with --upload. Defaults to docker-images/web.
+
+Environment:
+  MODEL_NAME
+      SentenceTransformer model baked into the image cache.
+  TORCH_VERSION
+      CPU-only Torch wheel version baked into the image.
 USAGE
 }
 
@@ -59,6 +68,11 @@ while [ "$#" -gt 0 ]; do
     --output-dir)
       require_value "$@"
       OUTPUT_DIR="$2"
+      shift 2
+      ;;
+    --platform)
+      require_value "$@"
+      PLATFORM="$2"
       shift 2
       ;;
     --upload)
@@ -119,6 +133,9 @@ GIT_COMMIT="$(git rev-parse HEAD)"
 CREATED_AT_UTC="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 docker build \
+  --platform "$PLATFORM" \
+  --build-arg "MODEL_NAME=${MODEL_NAME:-sentence-transformers/all-mpnet-base-v2}" \
+  --build-arg "TORCH_VERSION=${TORCH_VERSION:-2.12.0+cpu}" \
   -f deploy/web/Dockerfile \
   -t "$IMAGE_REF" \
   -t "$LATEST_REF" \
@@ -144,6 +161,7 @@ manifest = {
     "archive": "$ARCHIVE_NAME",
     "archive_size_bytes": int("$SIZE_BYTES"),
     "archive_sha256": "$SHA256",
+    "platform": "$PLATFORM",
     "git_commit": "$GIT_COMMIT",
     "created_at_utc": "$CREATED_AT_UTC",
 }

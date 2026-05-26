@@ -29,6 +29,8 @@
       selectAll,
       selectAllLabel,
       searchResults,
+      viewToggle,
+      flatList,
     }) {
       this.tree = tree;
       this.chipList = chipList;
@@ -39,7 +41,10 @@
       this.selectAll = selectAll;
       this.selectAllLabel = selectAllLabel;
       this.searchResults = searchResults;
+      this.viewToggle = viewToggle;
+      this.flatList = flatList;
       this.languageFilterSearchContext = null;
+      this.languageView = "tree";
       this.state = new LanguageFilterState({
         families: readFamiliesFromDom(tree),
         allLanguages: JSON.parse(tree.dataset.allLanguages || "[]"),
@@ -74,6 +79,12 @@
         });
       }
 
+      if (this.flatList) {
+        this.flatList.addEventListener("change", (event) => {
+          this.handleLanguageChange(event.target);
+        });
+      }
+
       expandAll?.addEventListener("click", () => {
         this.setTreeOpenState(true);
       });
@@ -86,32 +97,25 @@
         this.clearAllFilters();
       });
 
+      this.viewToggle?.addEventListener("click", () => {
+        this.toggleLanguageView();
+      });
+
       document.addEventListener("input", (event) => {
         if (event.target.matches("[data-language-search]")) {
-          if (!event.target.value.trim()) {
-            this.languageFilterSearchContext = null;
-          } else {
-            this.beginLanguageFilterSearchContext();
-          }
-          this.applyLanguageSearch(event.target.value);
+          this.handleLanguageSearchValue(event.target.value);
         }
       });
 
       document.addEventListener("focusin", (event) => {
         if (event.target.matches("[data-language-search]")) {
-          this.beginLanguageFilterSearchContext();
-          this.applyLanguageSearch(event.target.value);
+          this.handleLanguageSearchValue(event.target.value);
         }
       });
 
       document.addEventListener("search", (event) => {
         if (event.target.matches("[data-language-search]")) {
-          if (!event.target.value.trim()) {
-            this.languageFilterSearchContext = null;
-          } else {
-            this.beginLanguageFilterSearchContext();
-          }
-          this.applyLanguageSearch(event.target.value);
+          this.handleLanguageSearchValue(event.target.value);
         }
       });
 
@@ -139,6 +143,15 @@
       });
 
       this.syncUi();
+    }
+
+    handleLanguageSearchValue(value) {
+      if (!value.trim()) {
+        this.languageFilterSearchContext = null;
+      } else {
+        this.beginLanguageFilterSearchContext();
+      }
+      this.applyLanguageSearch(value);
     }
 
 
@@ -189,6 +202,12 @@
         });
       }
 
+      if (this.flatList) {
+        this.flatList.querySelectorAll("[data-language-checkbox]").forEach((checkbox) => {
+          checkbox.checked = this.state.selectedLanguages.has(checkbox.dataset.languageId);
+        });
+      }
+
       this.tree.querySelectorAll("[data-language-group]").forEach((checkbox) => {
         this.applyGroupCheckboxState(checkbox);
       });
@@ -226,6 +245,67 @@
       const selectedCount = ids.filter((languageId) => this.state.selectedLanguages.has(languageId)).length;
       checkbox.checked = ids.length > 0 && selectedCount === ids.length;
       checkbox.indeterminate = selectedCount > 0 && selectedCount < ids.length;
+    }
+
+    toggleLanguageView() {
+      this.languageView = this.languageView === "tree" ? "flat" : "tree";
+      this.renderLanguageView();
+    }
+
+    renderLanguageView() {
+      if (!this.viewToggle || !this.flatList) {
+        return;
+      }
+
+      const isFlat = this.languageView === "flat";
+      this.tree.hidden = isFlat;
+      this.flatList.hidden = !isFlat;
+      this.viewToggle.textContent = isFlat ? "Tree" : "List";
+      this.viewToggle.setAttribute(
+        "aria-label",
+        isFlat ? "Show language tree" : "Show flat language list"
+      );
+
+      if (isFlat && this.flatList.children.length === 0) {
+        this.renderFlatLanguageList();
+      }
+      this.syncCheckboxes();
+    }
+
+    renderFlatLanguageList() {
+      const languages = Array.from(this.state.languageById.values())
+        .filter((language) => Number(language.rows || 0) >= 100)
+        .sort((left, right) => {
+          const rowDelta = Number(right.rows || 0) - Number(left.rows || 0);
+          return rowDelta || left.label.localeCompare(right.label);
+        });
+
+      languages.forEach((language) => {
+        const row = document.createElement("label");
+        row.className = "check-row";
+        row.dataset.languageRow = "";
+        row.dataset.languageId = language.id;
+        row.dataset.languageLabel = language.label.toLowerCase();
+        row.dataset.rowCount = String(language.rows || 0);
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.dataset.languageId = language.id;
+        checkbox.dataset.languageCheckbox = "";
+        checkbox.value = language.label;
+        row.appendChild(checkbox);
+
+        const label = document.createElement("span");
+        label.className = "filter-label";
+        label.textContent = language.label;
+        row.appendChild(label);
+
+        const count = document.createElement("span");
+        count.className = "filter-count";
+        count.textContent = `(${Number(language.rows || 0).toLocaleString()})`;
+        row.appendChild(count);
+        this.flatList.appendChild(row);
+      });
     }
 
   }

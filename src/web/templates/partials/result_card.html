@@ -2,6 +2,7 @@
   <header class="result-header">
     <div>
       {% set audio_url = result.audio_mp3_url or result.audio_ogg_url %}
+      {% set auto_pronunciation = result.auto_pronunciation %}
       <div class="result-title-row">
         <h2>
           <a href="{{ result.wiktionary_url }}" target="_blank" rel="noopener noreferrer">
@@ -14,7 +15,24 @@
             {% if result.ipa %}
               <span class="ipa">{{ result.ipa }}</span>
             {% endif %}
-            {% if audio_url %}
+            {% if auto_pronunciation %}
+              <button
+                type="button"
+                class="audio-button auto-pronunciation-button"
+                data-auto-pronunciation
+                data-auto-pronunciation-voice="{{ auto_pronunciation.voice }}"
+                data-auto-pronunciation-ipa="{{ auto_pronunciation.ipa }}"
+                data-audio-word="{{ result.word }}"
+                data-audio-state="idle"
+                aria-label="Prepare automatic pronunciation for {{ result.word }}"
+              >
+                <svg class="audio-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M4 9v6h4l5 4V5L8 9H4z"></path>
+                  <path d="M16 8.5a5 5 0 0 1 0 7"></path>
+                  <path d="M18.5 6a8.5 8.5 0 0 1 0 12"></path>
+                </svg>
+              </button>
+            {% elif audio_url %}
               <button
                 type="button"
                 class="audio-button"

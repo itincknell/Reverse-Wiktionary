@@ -15,6 +15,7 @@ Any local `tests/` directory in this repo is staging-only and ignored by git.
 src/web/          FastAPI app, templates, static assets, session state.
 src/search/       Query encoding, API schemas, Qdrant filters, search client.
 src/common/       Small runtime constants/helpers shared by web/search code.
+native/           Vendored native extension sources built into the web image.
 deploy/web/       Docker Compose, web Dockerfile, Nginx config.
 deploy/compose/   Local Qdrant Compose helper.
 scripts/web/      Local/prod serving operations, image archives, smoke checks,

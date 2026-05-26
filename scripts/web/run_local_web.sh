@@ -11,8 +11,8 @@ Environment:
   HOST                           Default: 127.0.0.1
   PORT                           Default: 8000
   WEB_WORKERS                    Default: 1
-  COLLECTION_NAME                Default: reverse_wiktionary_v3
-  MODEL_NAME                     Default: sentence-transformers/all-mpnet-base-v2
+  COLLECTION_NAME                Default: reverse_wiktionary_test
+  MODEL_NAME                     Default: sentence-transformers/all-MiniLM-L6-v2
   MODEL_DEVICE                   Default: auto
   QDRANT_URL                     Default: http://localhost:6333
   QDRANT_HNSW_EF                 Default: 512
@@ -31,8 +31,8 @@ PORT="${PORT:-8000}"
 WORKERS="${WEB_WORKERS:-1}"
 
 export APP_ENV="${APP_ENV:-development}"
-export COLLECTION_NAME="${COLLECTION_NAME:-reverse_wiktionary_v3}"
-export MODEL_NAME="${MODEL_NAME:-sentence-transformers/all-mpnet-base-v2}"
+export COLLECTION_NAME="${COLLECTION_NAME:-reverse_wiktionary_test}"
+export MODEL_NAME="${MODEL_NAME:-sentence-transformers/all-MiniLM-L6-v2}"
 export MODEL_DEVICE="${MODEL_DEVICE:-auto}"
 export QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
 export QDRANT_HNSW_EF="${QDRANT_HNSW_EF:-512}"

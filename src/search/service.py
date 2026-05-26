@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from time import perf_counter
 
 from src.search.encoder import QueryEncoder
+from src.search.pronunciation import auto_pronunciation_for
 from src.search.qdrant_search import QdrantSearchClient
 from src.search.schemas import SearchRequest, SearchResponse, SearchTiming
 
@@ -39,6 +40,8 @@ class SearchService:
 
         has_more = len(results) > request.limit
         page_results = results[: request.limit]
+        for result in page_results:
+            result.auto_pronunciation = auto_pronunciation_for(result.lang, result.ipa)
         total_ms = (perf_counter() - started) * 1000
 
         return SearchResponse(

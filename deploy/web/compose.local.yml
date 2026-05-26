@@ -20,13 +20,17 @@ services:
 
   web:
     image: ${WEB_IMAGE:-reverse-wiktionary-web:latest}
+    platform: ${WEB_IMAGE_PLATFORM:-linux/amd64}
     build:
       context: ../..
       dockerfile: deploy/web/Dockerfile
+      args:
+        MODEL_NAME: ${MODEL_NAME:-sentence-transformers/all-MiniLM-L6-v2}
+        TORCH_VERSION: ${TORCH_VERSION:-2.12.0+cpu}
     environment:
       APP_ENV: development
-      COLLECTION_NAME: ${COLLECTION_NAME:-reverse_wiktionary_v3}
-      MODEL_NAME: ${MODEL_NAME:-sentence-transformers/all-mpnet-base-v2}
+      COLLECTION_NAME: ${COLLECTION_NAME:-reverse_wiktionary_test}
+      MODEL_NAME: ${MODEL_NAME:-sentence-transformers/all-MiniLM-L6-v2}
       MODEL_DEVICE: ${MODEL_DEVICE:-auto}
       QDRANT_URL: http://qdrant:6333
       QDRANT_HNSW_EF: ${QDRANT_HNSW_EF:-512}
@@ -40,7 +44,7 @@ services:
       AUDIO_FETCH_CONNECT_TIMEOUT_SECONDS: ${AUDIO_FETCH_CONNECT_TIMEOUT_SECONDS:-2}
       AUDIO_FETCH_READ_TIMEOUT_SECONDS: ${AUDIO_FETCH_READ_TIMEOUT_SECONDS:-8}
       AUDIO_FETCH_MAX_BYTES: ${AUDIO_FETCH_MAX_BYTES:-5242880}
-      AUDIO_FETCH_USER_AGENT: "${AUDIO_FETCH_USER_AGENT:-Reverse-Wiktionary/1.0 (https://reverse-wiktionary.com)}"
+      AUDIO_FETCH_USER_AGENT: "${AUDIO_FETCH_USER_AGENT:-Reverse-Wiktionary/1.1 (https://reverse-wiktionary.com)}"
     volumes:
       - ../../data/processed/latest:/app/data/processed/latest:ro
     ports:

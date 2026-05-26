@@ -94,7 +94,7 @@ def load_settings() -> WebSettings:
         asset_version=os.getenv("ASSET_VERSION", "dev"),
         audio_fetch_user_agent=os.getenv(
             "AUDIO_FETCH_USER_AGENT",
-            "Reverse-Wiktionary/1.0 (https://reverse-wiktionary.com)",
+            "Reverse-Wiktionary/1.1 (https://reverse-wiktionary.com)",
         ),
         audio_fetch_connect_timeout_seconds=_float_env(
             "AUDIO_FETCH_CONNECT_TIMEOUT_SECONDS",

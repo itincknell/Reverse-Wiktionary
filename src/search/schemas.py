@@ -100,6 +100,15 @@ class SearchTiming(BaseModel):
     total: float
 
 
+class AutoPronunciation(BaseModel):
+    """
+    Automatic pronunciation metadata derived from a supported IPA transducer.
+    """
+
+    voice: str
+    ipa: str
+
+
 class SearchResult(BaseModel):
     """
     Normalized search result returned by the stable API and UI renderer.
@@ -114,6 +123,7 @@ class SearchResult(BaseModel):
     glosses: list[str]
     expansion: str | None = None
     ipa: str | None = None
+    auto_pronunciation: AutoPronunciation | None = None
     audio_ogg_url: str | None = None
     audio_mp3_url: str | None = None
     wiktionary_url: str

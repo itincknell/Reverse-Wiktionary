@@ -12,23 +12,26 @@ from pathlib import Path
 from time import perf_counter
 
 from fastapi import FastAPI, Form, HTTPException, Query, Request, Response
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from src.common.pos import ALLOWED_POS
 from src.search.encoder import QueryEncoder, QueryEncoderConfig
+from src.search.pronunciation import synthesize_pronunciation
 from src.search.qdrant_search import QdrantSearchClient, QdrantSearchConfig
 from src.search.schemas import SearchRequest, SearchResponse
 from src.search.service import SearchService
 from src.web.audio_cache import AudioFetchConfig, AudioFetchError, fetch_wikimedia_audio
 from src.web.config import WebSettings, load_settings
+from src.web.pronunciation_assets import asset_path, playback_voice_id, voice_asset_path
 from src.web.state import SESSION_COOKIE, ClientSearchState, RedisSessionStore
 from src.web.taxonomy import load_language_taxonomy
 
 
 LOGGER = logging.getLogger(__name__)
 PACKAGE_DIR = Path(__file__).resolve().parent
+LONG_CACHE_HEADERS = {"Cache-Control": "public, max-age=31536000, immutable"}
 
 
 def create_app(settings: WebSettings | None = None) -> FastAPI:
@@ -82,7 +85,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
 
         yield
 
-    app = FastAPI(title="Reverse Wiktionary", version="1.0.0", lifespan=lifespan)
+    app = FastAPI(title="Reverse Wiktionary", version="1.1.0", lifespan=lifespan)
     app.state.settings = settings
     app.state.available_langs = []
     app.state.available_pos = list(ALLOWED_POS)
@@ -156,9 +159,7 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
         except AudioFetchError as exc:
             raise HTTPException(status_code=exc.status_code, detail=exc.message) from exc
 
-        headers = {
-            "Cache-Control": "public, max-age=31536000, immutable",
-        }
+        headers = dict(LONG_CACHE_HEADERS)
         if audio.content_length is not None:
             headers["Content-Length"] = str(audio.content_length)
 
@@ -166,6 +167,67 @@ def create_app(settings: WebSettings | None = None) -> FastAPI:
             audio.chunks,
             media_type=audio.media_type,
             headers=headers,
+        )
+
+    @app.get("/api/ipa-pronunciation")
+    def ipa_pronunciation(
+        voice: str = Query(..., min_length=1, max_length=32),
+        ipa: str = Query(..., min_length=1, max_length=256),
+    ) -> Response:
+        """
+        Return the supported meSpeak phoneme payload for one IPA string.
+        """
+        result = synthesize_pronunciation(voice=voice, ipa=ipa)
+        payload = {
+            "supported": result.supported,
+            "voice": result.voice,
+            "playback_voice": playback_voice_id(result.voice) if result.supported and result.voice else None,
+            "phonemes": result.phonemes,
+            "reason": result.reason,
+            "offset": result.offset,
+        }
+        return Response(
+            content=json.dumps(payload),
+            media_type="application/json",
+            headers=LONG_CACHE_HEADERS,
+        )
+
+    @app.get("/api/pronunciation-assets/mespeak.js")
+    def pronunciation_runtime_asset() -> FileResponse:
+        """
+        Serve the browser pronunciation runtime with immutable cache headers.
+        """
+        return FileResponse(
+            asset_path("mespeak.js"),
+            media_type="application/javascript",
+            headers=LONG_CACHE_HEADERS,
+        )
+
+    @app.get("/api/pronunciation-assets/config")
+    def pronunciation_config_asset() -> FileResponse:
+        """
+        Serve the browser pronunciation runtime configuration.
+        """
+        return FileResponse(
+            asset_path("mespeak_config.json"),
+            media_type="application/json",
+            headers=LONG_CACHE_HEADERS,
+        )
+
+    @app.get("/api/pronunciation-assets/voices/{voice}")
+    def pronunciation_voice_asset(voice: str) -> FileResponse:
+        """
+        Serve an allowlisted canonical voice definition.
+        """
+        try:
+            path = voice_asset_path(voice)
+        except (KeyError, FileNotFoundError) as exc:
+            raise HTTPException(status_code=404, detail="unknown pronunciation voice") from exc
+
+        return FileResponse(
+            path,
+            media_type="application/json",
+            headers=LONG_CACHE_HEADERS,
         )
 
     @app.post("/api/v1/search")

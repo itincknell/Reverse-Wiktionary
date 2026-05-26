@@ -187,9 +187,10 @@ Cloudflare Tunnel: outbound-only public path
 
 ## Web Image Archive
 
-The web image contains the query encoder runtime and its PyTorch dependency
-tree. Building it directly on the small beta VM is slow, so deployment can load
-a prebuilt Docker archive instead of rebuilding locally.
+The web image contains the query encoder runtime, a CPU-only PyTorch stack, the
+default SentenceTransformer model cache, the native IPA-to-meSpeak extension,
+and the app code. Building it directly on the small beta VM is slow, so
+deployment can load a prebuilt Docker archive instead of rebuilding locally.
 
 Build and save:
 
