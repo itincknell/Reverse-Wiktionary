@@ -19,6 +19,7 @@ env/
 ENV/
 
 # Local data and generated artifacts
+ARTIFACTS/
 data/
 /out/
 /tmp/

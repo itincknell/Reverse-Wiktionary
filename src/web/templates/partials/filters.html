@@ -58,89 +58,91 @@
     </div>
     <div data-language-inputs></div>
     <div
-      class="filter-options tall language-flat-list"
-      data-language-flat-list
-      hidden
-    ></div>
-    <div
       id="language-options"
       class="filter-options tall taxonomy-tree"
       data-language-tree
       data-selected-langs='{{ state.selected_langs|tojson }}'
       data-all-languages='{{ language_taxonomy.all_languages|tojson }}'
     >
-      <div class="taxonomy-tree-actions" aria-label="Language tree controls">
-        <button class="link-button" type="button" data-taxonomy-expand-all>Expand all</button>
-        <button class="link-button" type="button" data-taxonomy-collapse-all>Collapse all</button>
-      </div>
+      <div
+        class="language-flat-list"
+        data-language-flat-list
+        hidden
+      ></div>
+      <div data-language-tree-content>
+        <div class="taxonomy-tree-actions" aria-label="Language tree controls">
+          <button class="link-button" type="button" data-taxonomy-expand-all>Expand all</button>
+          <button class="link-button" type="button" data-taxonomy-collapse-all>Collapse all</button>
+        </div>
 
-      <label class="check-row taxonomy-control" data-language-select-all-row>
-        <input type="checkbox" data-language-select-all>
-        <span data-language-select-all-label>Select all</span>
-      </label>
+        <label class="check-row taxonomy-control" data-language-select-all-row>
+          <input type="checkbox" data-language-select-all>
+          <span data-language-select-all-label>Select all</span>
+        </label>
 
-      {% for family in language_taxonomy.families %}
-        <details
-          class="taxonomy-family"
-          data-family-id="{{ family.id }}"
-          data-family-label="{{ family.label|e }}"
-          data-row-count="{{ family.rows }}"
-        >
-          <summary>
-            <label class="check-row taxonomy-summary" data-language-group-row>
-              <input
-                type="checkbox"
-                data-language-group="family"
-                data-group-id="{{ family.id }}"
-              >
-              <span class="filter-label">{{ family.label }}</span>
-              <span class="filter-count">({{ family.rows }})</span>
-            </label>
-          </summary>
-          <div class="taxonomy-branches">
-            {% for branch in family.branches %}
-              <details
-                class="taxonomy-branch"
-                data-branch-id="{{ branch.id }}"
-                data-branch-label="{{ branch.label|e }}"
-                data-row-count="{{ branch.rows }}"
-              >
-                <summary>
-                  <label class="check-row taxonomy-summary" data-language-group-row>
-                    <input
-                      type="checkbox"
-                      data-language-group="branch"
-                      data-group-id="{{ branch.id }}"
-                    >
-                    <span class="filter-label">{{ branch.label }}</span>
-                    <span class="filter-count">({{ branch.rows }})</span>
-                  </label>
-                </summary>
-                <div class="taxonomy-languages">
-                  {% for language in branch.languages %}
-                    <label
-                      class="check-row"
-                      data-language-row
-                      data-language-id="{{ language.id }}"
-                      data-language-label="{{ language.label|lower|e }}"
-                      data-row-count="{{ language.rows }}"
-                    >
+        {% for family in language_taxonomy.families %}
+          <details
+            class="taxonomy-family"
+            data-family-id="{{ family.id }}"
+            data-family-label="{{ family.label|e }}"
+            data-row-count="{{ family.rows }}"
+          >
+            <summary>
+              <label class="check-row taxonomy-summary" data-language-group-row>
+                <input
+                  type="checkbox"
+                  data-language-group="family"
+                  data-group-id="{{ family.id }}"
+                >
+                <span class="filter-label">{{ family.label }}</span>
+                <span class="filter-count">({{ family.rows }})</span>
+              </label>
+            </summary>
+            <div class="taxonomy-branches">
+              {% for branch in family.branches %}
+                <details
+                  class="taxonomy-branch"
+                  data-branch-id="{{ branch.id }}"
+                  data-branch-label="{{ branch.label|e }}"
+                  data-row-count="{{ branch.rows }}"
+                >
+                  <summary>
+                    <label class="check-row taxonomy-summary" data-language-group-row>
                       <input
                         type="checkbox"
-                        data-language-checkbox
-                        data-language-id="{{ language.id }}"
-                        value="{{ language.label }}"
+                        data-language-group="branch"
+                        data-group-id="{{ branch.id }}"
                       >
-                      <span class="filter-label">{{ language.label }}</span>
-                      <span class="filter-count">({{ language.rows }})</span>
+                      <span class="filter-label">{{ branch.label }}</span>
+                      <span class="filter-count">({{ branch.rows }})</span>
                     </label>
-                  {% endfor %}
-                </div>
-              </details>
-            {% endfor %}
-          </div>
-        </details>
-      {% endfor %}
+                  </summary>
+                  <div class="taxonomy-languages">
+                    {% for language in branch.languages %}
+                      <label
+                        class="check-row"
+                        data-language-row
+                        data-language-id="{{ language.id }}"
+                        data-language-label="{{ language.label|lower|e }}"
+                        data-row-count="{{ language.rows }}"
+                      >
+                        <input
+                          type="checkbox"
+                          data-language-checkbox
+                          data-language-id="{{ language.id }}"
+                          value="{{ language.label }}"
+                        >
+                        <span class="filter-label">{{ language.label }}</span>
+                        <span class="filter-count">({{ language.rows }})</span>
+                      </label>
+                    {% endfor %}
+                  </div>
+                </details>
+              {% endfor %}
+            </div>
+          </details>
+        {% endfor %}
+      </div>
     </div>
   </div>
 </details>

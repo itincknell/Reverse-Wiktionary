@@ -326,7 +326,7 @@
       }
 
       const meSpeak = await ensureVoice(voice, playbackVoice);
-      const spoken = meSpeak.speak(`[[${payload.phonemes}]]`, { voice: playbackVoice });
+      const spoken = meSpeak.speak(`[[${payload.phonemes}]]`, { voice: playbackVoice, speed: 60 });
       return Boolean(spoken);
     }
 

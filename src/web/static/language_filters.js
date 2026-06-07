@@ -28,6 +28,7 @@
     const searchResults = document.querySelector("[data-language-search-results]");
     const viewToggle = document.querySelector("[data-language-view-toggle]");
     const flatList = document.querySelector("[data-language-flat-list]");
+    const treeContent = document.querySelector("[data-language-tree-content]");
 
     if (!tree || !chipList || !inputHost) {
       return null;
@@ -45,6 +46,7 @@
       searchResults,
       viewToggle,
       flatList,
+      treeContent,
     });
     controller.bind();
     return controller;

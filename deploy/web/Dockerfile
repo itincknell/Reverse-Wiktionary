@@ -47,7 +47,9 @@ import os
 
 from sentence_transformers import SentenceTransformer
 
-SentenceTransformer(os.environ["MODEL_NAME"], device="cpu")
+model_name = os.environ["MODEL_NAME"]
+if not model_name.startswith("local-preview/dummy-"):
+    SentenceTransformer(model_name, device="cpu")
 PY
 
 COPY src ./src

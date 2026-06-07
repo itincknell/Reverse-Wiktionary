@@ -25,12 +25,12 @@ services:
       context: ../..
       dockerfile: deploy/web/Dockerfile
       args:
-        MODEL_NAME: ${MODEL_NAME:-sentence-transformers/all-MiniLM-L6-v2}
+        MODEL_NAME: ${MODEL_NAME:-local-preview/dummy-32}
         TORCH_VERSION: ${TORCH_VERSION:-2.12.0+cpu}
     environment:
       APP_ENV: development
-      COLLECTION_NAME: ${COLLECTION_NAME:-reverse_wiktionary_test}
-      MODEL_NAME: ${MODEL_NAME:-sentence-transformers/all-MiniLM-L6-v2}
+      COLLECTION_NAME: ${COLLECTION_NAME:-reverse_wiktionary_sample_dummy_v6}
+      MODEL_NAME: ${MODEL_NAME:-local-preview/dummy-32}
       MODEL_DEVICE: ${MODEL_DEVICE:-auto}
       QDRANT_URL: http://qdrant:6333
       QDRANT_HNSW_EF: ${QDRANT_HNSW_EF:-512}
@@ -41,12 +41,13 @@ services:
       MAX_LIMIT: ${MAX_LIMIT:-100}
       SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-86400}
       SECURE_COOKIES: "false"
+      ASSET_VERSION: ${ASSET_VERSION:-local-preview}
       AUDIO_FETCH_CONNECT_TIMEOUT_SECONDS: ${AUDIO_FETCH_CONNECT_TIMEOUT_SECONDS:-2}
       AUDIO_FETCH_READ_TIMEOUT_SECONDS: ${AUDIO_FETCH_READ_TIMEOUT_SECONDS:-8}
       AUDIO_FETCH_MAX_BYTES: ${AUDIO_FETCH_MAX_BYTES:-5242880}
       AUDIO_FETCH_USER_AGENT: "${AUDIO_FETCH_USER_AGENT:-Reverse-Wiktionary/1.1 (https://reverse-wiktionary.com)}"
     volumes:
-      - ../../data/processed/latest:/app/data/processed/latest:ro
+      - ../../data/processed:/app/data/processed:ro
     ports:
       - "8000:8000"
     depends_on:

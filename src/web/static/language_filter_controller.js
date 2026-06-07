@@ -31,6 +31,7 @@
       searchResults,
       viewToggle,
       flatList,
+      treeContent,
     }) {
       this.tree = tree;
       this.chipList = chipList;
@@ -43,6 +44,7 @@
       this.searchResults = searchResults;
       this.viewToggle = viewToggle;
       this.flatList = flatList;
+      this.treeContent = treeContent;
       this.languageFilterSearchContext = null;
       this.languageView = "tree";
       this.state = new LanguageFilterState({
@@ -258,7 +260,12 @@
       }
 
       const isFlat = this.languageView === "flat";
-      this.tree.hidden = isFlat;
+      if (this.treeContent) {
+        this.treeContent.hidden = isFlat;
+        this.tree.hidden = false;
+      } else {
+        this.tree.hidden = isFlat;
+      }
       this.flatList.hidden = !isFlat;
       this.viewToggle.textContent = isFlat ? "Tree" : "List";
       this.viewToggle.setAttribute(

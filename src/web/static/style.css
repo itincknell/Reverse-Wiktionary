@@ -304,7 +304,16 @@ textarea:focus,
   display: inline-flex;
 }
 
+.language-flat-list {
+  display: grid;
+  gap: 6px;
+}
+
 .language-flat-list[hidden] {
+  display: none;
+}
+
+[data-language-tree-content][hidden] {
   display: none;
 }
 
@@ -506,7 +515,7 @@ textarea:focus,
   display: flex;
   flex-wrap: wrap;
   gap: 8px 12px;
-  align-items: flex-end;
+  align-items: baseline;
 }
 
 .result-header h2 a {
@@ -529,7 +538,7 @@ textarea:focus,
 .pronunciation {
   display: flex;
   gap: 10px;
-  align-items: flex-end;
+  align-items: baseline;
   padding-left: 12px;
 }
 
