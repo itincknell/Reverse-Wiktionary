@@ -245,6 +245,12 @@ cd /opt/reverse-wiktionary/app
 Use `--replace-existing` when intentionally replacing an existing restored
 collection.
 
+The restore step removes stale serving collections named
+`reverse_wiktionary_v<N>` after the target collection has been recovered. This
+keeps the beta VM from holding multiple full Qdrant indexes in memory. Use
+`--keep-stale-collections` only for deliberate side-by-side rollback testing;
+normal rollback should restore the desired snapshot from Blob.
+
 ## Web Smoke
 
 ```bash

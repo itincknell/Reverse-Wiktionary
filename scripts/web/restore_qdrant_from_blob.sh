@@ -10,6 +10,7 @@ runId=""
 replaceExisting="false"
 keepSnapshot="false"
 identityLogin="true"
+cleanupStaleCollections="${CLEANUP_STALE_QDRANT_COLLECTIONS:-true}"
 
 usage() {
   cat <<'USAGE'
@@ -23,12 +24,18 @@ Usage:
     [--qdrant-url URL] \
     [--replace-existing] \
     [--keep-snapshot] \
+    [--keep-stale-collections] \
     [--skip-identity-login]
 
 Restores a Qdrant collection from the serving snapshot pointed to by
 indexes/latest.json, or from indexes/<run_id>/manifest.json when --run-id is
 provided. Also stages serving_metadata.json and, when present,
 language_taxonomy.json from processed/latest.json for the web app.
+
+After a successful restore, stale serving collections named
+reverse_wiktionary_v<N> are removed by default so the serving VM does not keep
+multiple full Qdrant indexes resident. Use --keep-stale-collections only for
+intentional side-by-side rollback testing.
 USAGE
 }
 
@@ -64,6 +71,10 @@ while [ "$#" -gt 0 ]; do
       ;;
     --keep-snapshot)
       keepSnapshot="true"
+      shift
+      ;;
+    --keep-stale-collections)
+      cleanupStaleCollections="false"
       shift
       ;;
     --skip-identity-login)
@@ -228,6 +239,27 @@ done
 
 curl -fsS "$qdrantUrl/collections/$collectionName" \
   | jq '{status: .result.status, points: .result.points_count, indexed: .result.indexed_vectors_count, payload_schema: .result.payload_schema}'
+
+if [ "$cleanupStaleCollections" = "true" ]; then
+  if [[ "$collectionName" =~ ^reverse_wiktionary_v[0-9]+$ ]]; then
+    echo "removing stale reverse_wiktionary_v<N> collections"
+    while IFS= read -r existingCollection; do
+      if [ "$existingCollection" = "$collectionName" ]; then
+        continue
+      fi
+
+      if [[ "$existingCollection" =~ ^reverse_wiktionary_v[0-9]+$ ]]; then
+        echo "deleting stale collection: $existingCollection"
+        curl -fsS -X DELETE "$qdrantUrl/collections/$existingCollection" >/dev/null
+      fi
+    done < <(
+      curl -fsS "$qdrantUrl/collections" \
+        | jq -r '.result.collections[].name'
+    )
+  else
+    echo "stale collection cleanup skipped: collection name does not match reverse_wiktionary_v<N>"
+  fi
+fi
 
 echo "staging processed metadata"
 az storage blob download \
