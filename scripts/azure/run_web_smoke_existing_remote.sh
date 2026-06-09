@@ -6,7 +6,7 @@ set -euo pipefail
 repoDir="${repoDir:-/opt/reverse-wiktionary-web-smoke}"
 storageAccount="${storageAccount:-}"
 container="${container:-}"
-collectionName="${collectionName:-reverse_wiktionary_v3}"
+collectionName="${collectionName:-reverse_wiktionary_v5}"
 modelName="${modelName:-sentence-transformers/all-mpnet-base-v2}"
 qdrantHnswEf="${qdrantHnswEf:-512}"
 qdrantAcornMaxSelectivity="${qdrantAcornMaxSelectivity:-1.0}"

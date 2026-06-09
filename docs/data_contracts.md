@@ -43,7 +43,7 @@ indexes/latest.json
 Expected serving collection:
 
 ```text
-collection_name: reverse_wiktionary_v3
+collection_name: reverse_wiktionary_v5
 model: sentence-transformers/all-mpnet-base-v2
 vector_size: 768
 distance: Cosine

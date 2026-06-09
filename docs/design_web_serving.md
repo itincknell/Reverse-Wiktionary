@@ -391,7 +391,7 @@ memory pressure but did not meet filtered retrieval quality requirements.
   "status": "ok",
   "qdrant": "ok",
   "redis": "ok",
-  "collection": "reverse_wiktionary_v3",
+  "collection": "reverse_wiktionary_v5",
   "model": "loaded",
   "vector_size": 768,
   "available_langs": 4663,

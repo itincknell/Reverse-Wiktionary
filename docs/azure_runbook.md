@@ -13,7 +13,7 @@ SUBSCRIPTION_ID="<azure-subscription-id>"
 RESOURCE_GROUP="<resource-group>"
 STORAGE_ACCOUNT="<storage-account>"
 CONTAINER="<blob-container>"
-COLLECTION_NAME="reverse_wiktionary_v3"
+COLLECTION_NAME="reverse_wiktionary_v5"
 ADMIN_USER="azureuser"
 ```
 

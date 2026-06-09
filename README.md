@@ -36,7 +36,7 @@ Reverse-Wiktionary
 ## Current Serving Baseline
 
 ```text
-collection_name: reverse_wiktionary_v3
+collection_name: reverse_wiktionary_v5
 current model: sentence-transformers/all-mpnet-base-v2
 current vector_size: 768
 indexed points: 3,869,247

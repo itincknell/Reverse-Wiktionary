@@ -30,7 +30,7 @@ services:
     environment:
       APP_ENV: production
       ASSET_VERSION: ${ASSET_VERSION:-local}
-      COLLECTION_NAME: ${COLLECTION_NAME:-reverse_wiktionary_v3}
+      COLLECTION_NAME: ${COLLECTION_NAME:-reverse_wiktionary_v5}
       MODEL_NAME: ${MODEL_NAME:-sentence-transformers/all-mpnet-base-v2}
       MODEL_DEVICE: ${MODEL_DEVICE:-auto}
       QDRANT_URL: http://qdrant:6333

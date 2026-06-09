@@ -9,7 +9,7 @@ RESOURCE_GROUP=""
 VM_NAME=""
 STORAGE_ACCOUNT=""
 CONTAINER=""
-COLLECTION_NAME="reverse_wiktionary_v3"
+COLLECTION_NAME="reverse_wiktionary_v5"
 MODEL_NAME="sentence-transformers/all-mpnet-base-v2"
 QDRANT_HNSW_EF="512"
 QDRANT_ACORN_MAX_SELECTIVITY="1.0"
@@ -31,7 +31,7 @@ Required:
 
 Optional:
   --collection-name NAME
-      Defaults to reverse_wiktionary_v3.
+      Defaults to reverse_wiktionary_v5.
   --model-name NAME
       Defaults to sentence-transformers/all-mpnet-base-v2.
   --vm-repo-dir PATH

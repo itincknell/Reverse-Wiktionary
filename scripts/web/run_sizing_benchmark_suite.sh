@@ -5,7 +5,7 @@ set -euo pipefail
 
 BASE_URL="${BASE_URL:-http://127.0.0.1:8000}"
 QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
-COLLECTION_NAME="${COLLECTION_NAME:-reverse_wiktionary_v3}"
+COLLECTION_NAME="${COLLECTION_NAME:-reverse_wiktionary_v5}"
 RUN_ID="${RUN_ID:-sizing-$(date -u +%Y%m%dT%H%M%SZ)}"
 OUTPUT_ROOT="${OUTPUT_ROOT:-runs/web_smoke}"
 ITERATIONS="20"
@@ -24,7 +24,7 @@ Optional:
   --qdrant-url URL
       Defaults to QDRANT_URL or http://localhost:6333.
   --collection-name NAME
-      Defaults to reverse_wiktionary_v3.
+      Defaults to reverse_wiktionary_v5.
   --run-id RUN_ID
       Defaults to sizing-<UTC timestamp>.
   --output-root PATH
